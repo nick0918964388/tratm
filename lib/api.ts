@@ -212,20 +212,27 @@ interface TrainStatus {
   nextStation: string | null;
 }
 
+// 添加一個輔助函數來找下一站
+function findNextStation(stopTimes: TrainStop[], currentStationId: string): string | null {
+  const currentIndex = stopTimes.findIndex(stop => stop.stationId === currentStationId);
+  if (currentIndex === -1 || currentIndex === stopTimes.length - 1) return null;
+  return stopTimes[currentIndex + 1].stationId;
+}
+
 async function determineTrainStatus(
   trainSchedules: string[],
   currentTime: Date
 ): Promise<TrainStatus> {
-  let foundCurrentStation = false;
   let lastCompletedTrain = null;
   let nextUpcomingTrain = null;
 
-  // 按順序檢查每個車次
-  for (const trainNo of trainSchedules) {
-    try {
-      // 跳過非數字車次
-      if (!/^\d+$/.test(trainNo)) continue;
+  // 先過濾出數字車次
+  const validSchedules = trainSchedules.filter(trainNo => /^\d+$/.test(trainNo));
+  console.log('有效的車次清單:', validSchedules);
 
+  // 按順序檢查每個車次
+  for (const trainNo of validSchedules) {
+    try {
       // 獲取車次時刻表和即時資訊
       const [scheduleData, liveData] = await Promise.all([
         getTrainSchedule(trainNo),
@@ -295,10 +302,20 @@ async function determineTrainStatus(
   }
 
   // 在兩個車次之間
+  if (lastCompletedTrain) {  // 添加空值檢查
+    return {
+      status: '準備中',
+      currentTrain: lastCompletedTrain.trainNo,
+      currentStation: lastCompletedTrain.lastStation,
+      nextStation: null
+    };
+  }
+
+  // 預設返回
   return {
-    status: '準備中',
-    currentTrain: lastCompletedTrain.trainNo,
-    currentStation: lastCompletedTrain.lastStation,
+    status: '機務段待發車',
+    currentTrain: null,
+    currentStation: null,
     nextStation: null
   };
 }

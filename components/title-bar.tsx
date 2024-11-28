@@ -27,16 +27,10 @@ export function TitleBar({ onRefresh, refreshing, schedules }: TitleBarProps) {
         duration: 5000,
       })
 
-      // 獲取所有列車及其車次清單
+      // 獲取所有列車
       const { data: trains } = await supabase
         .from('trains')
-        .select(`
-          id,
-          current_train,
-          schedules (
-            train_number
-          )
-        `)
+        .select('id, current_train')
 
       if (!trains) {
         throw new Error('無法獲取列車資料')
@@ -46,17 +40,24 @@ export function TitleBar({ onRefresh, refreshing, schedules }: TitleBarProps) {
 
       for (const train of trains) {
         try {
-          const schedules = train.schedules?.map(s => s.train_number) || []
-          
-          if (schedules.length === 0) {
+          // 獲取該車號的所有車次
+          const { data: schedules } = await supabase
+            .from('train_schedules')
+            .select('train_number')
+            .eq('train_id', train.id)
+
+          if (!schedules || schedules.length === 0) {
             console.log(`列車 ${train.id} 沒有車次清單，跳過更新`)
             continue
           }
 
+          const trainNumbers = schedules.map(s => s.train_number)
+          console.log(`列車 ${train.id} 的車次清單:`, trainNumbers)
+
           await updateTrainStatus(
             train.id,
             train.current_train,
-            schedules
+            trainNumbers
           )
           
           totalUpdated++
