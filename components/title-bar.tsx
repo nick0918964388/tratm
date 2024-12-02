@@ -30,7 +30,7 @@ export function TitleBar({ onRefresh, refreshing, schedules }: TitleBarProps) {
       // 獲取所有列車
       const { data: trains } = await supabase
         .from('trains')
-        .select('id, current_train')
+        .select('id, current_train, status')
 
       if (!trains) {
         throw new Error('無法獲取列車資料')
@@ -38,9 +38,21 @@ export function TitleBar({ onRefresh, refreshing, schedules }: TitleBarProps) {
 
       let totalUpdated = 0
 
-      for (const train of trains) {
+      // 使用 Promise.all 來並行處理所有更新
+      await Promise.all(trains.map(async (train) => {
+        // 如果列車狀態是檢修相關的，就跳過更新
+        if ([
+          '在段待修', 
+          '臨修(C2)', 
+          '進廠檢修(3B)', 
+          '在段保養(2A)',
+          '預備'  // 新增這個狀態
+        ].includes(train.status)) {
+          console.log(`列車 ${train.id} 在檢修中或預備中，跳過更新`)
+          return
+        }
+
         try {
-          // 獲取該車號的所有車次
           const { data: schedules } = await supabase
             .from('train_schedules')
             .select('train_number')
@@ -48,23 +60,16 @@ export function TitleBar({ onRefresh, refreshing, schedules }: TitleBarProps) {
 
           if (!schedules || schedules.length === 0) {
             console.log(`列車 ${train.id} 沒有車次清單，跳過更新`)
-            continue
+            return
           }
 
           const trainNumbers = schedules.map(s => s.train_number)
-          console.log(`列車 ${train.id} 的車次清單:`, trainNumbers)
-
-          await updateTrainStatus(
-            train.id,
-            train.current_train,
-            trainNumbers
-          )
-          
+          await updateTrainStatus(train.id, train.current_train, trainNumbers)
           totalUpdated++
         } catch (error) {
           console.error(`更新列車 ${train.id} 失敗:`, error)
         }
-      }
+      }))
 
       toast({
         title: "更新完成",

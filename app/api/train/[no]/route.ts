@@ -16,14 +16,12 @@ export async function GET(
           'Accept': 'application/json',
           'Referer': 'https://taiwanhelper.com/'
         },
-        cache: 'no-store'  // 禁用快取
+        next: { revalidate: 300 }  // 5分鐘快取
       }
     )
 
     if (!response.ok) {
       console.error('API 回應錯誤:', response.status, response.statusText)
-      const text = await response.text()
-      console.error('錯誤詳情:', text)
       throw new Error(`HTTP error! status: ${response.status}`)
     }
 
@@ -33,7 +31,7 @@ export async function GET(
     // 檢查資料結構
     if (!data.pageProps?.train) {
       console.error('無效的資料格式:', data)
-      throw new Error('Invalid data format')
+      throw new Error('無效的資料格式')
     }
 
     // 轉換資料格式
@@ -56,7 +54,12 @@ export async function GET(
   } catch (error) {
     console.error('獲取列車時刻表失敗:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch train schedule', details: error.message },
+      { 
+        error: '獲取列車時刻表失敗', 
+        details: error instanceof Error ? error.message : '未知錯誤',
+        no: params.no,
+        stopTimes: []
+      },
       { status: 500 }
     )
   }

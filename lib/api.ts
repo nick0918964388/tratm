@@ -78,30 +78,55 @@ export async function getTrainLive(trainNo: string): Promise<TrainLiveData> {
   }
 }
 
-interface ParsedLiveData {
-  currentStationId: string
-  delayMap: { [stationId: string]: number }
-}
-
-function parseLiveData(trainNo: string, data: TrainLiveData): ParsedLiveData {
+export function parseLiveData(trainNo: string, data: TrainLiveData): {
+  currentStationId: string;
+  nextStationId: string;
+  delayMap: { [stationId: string]: number };
+} {
   // 找出目前車站
   const currentStationEntry = Object.entries(data.stationLiveMap)
-    .find(([key, value]) => key.startsWith(`${trainNo}_`) && value === 0)
+    .find(([key, value]) => {
+      const [trainNumber, _] = key.split('_')
+      return trainNumber === trainNo
+    })
   
   const currentStationId = currentStationEntry 
     ? currentStationEntry[0].split('_')[1] 
     : ''
 
-  // 建立誤點對照表
+  // 找出下一站 (stationLiveMap 中非 0 的站點)
+  const nextStationEntry = Object.entries(data.stationLiveMap)
+    .find(([key, value]) => {
+      const [trainNumber, _] = key.split('_')
+      return trainNumber === trainNo
+    })
+  
+  const nextStationId = nextStationEntry
+    ? nextStationEntry[0].split('_')[1]
+    : ''
+  console.log('下一站:', nextStationId)  // 記錄下一站
+  // 建立誤點對照表 - 修改這部分的邏輯
   const delayMap = Object.entries(data.trainLiveMap)
     .reduce((acc, [key, value]) => {
-      const stationId = key.split('_')[1]
-      acc[stationId] = value
+      // 只處理屬於這個車次的資料
+      if (key.startsWith(`${trainNo}_`)) {
+        const stationId = key.split('_')[1]
+        // 值為 0 表示準點，1 表示誤點 1 分鐘，2 表示誤點 2 分鐘，以此類推
+        acc[stationId] = value
+      }
       return acc
     }, {} as { [key: string]: number })
 
+  console.log('解析後的誤點資訊:', {
+    trainNo,
+    delayMap,
+    currentStationId,
+    nextStationId
+  })
+
   return {
     currentStationId,
+    nextStationId,
     delayMap
   }
 }
@@ -131,7 +156,7 @@ function getTrainStatus(
   // 如果當前時間早於第一站到達時間
   if (currentTime < firstTimeInMinutes) {
     return {
-      status: '機務段待發車',
+      status: '等待出車',
       currentStation: firstStation.stationId,
       nextStation: stopTimes[1]?.stationId || null
     }
@@ -230,6 +255,16 @@ async function determineTrainStatus(
   const validSchedules = trainSchedules.filter(trainNo => /^\d+$/.test(trainNo));
   console.log('有效的車次清單:', validSchedules);
 
+  // 如果沒有有效車次，維持原狀態
+  if (validSchedules.length === 0) {
+    return {
+      status: '等待出車',  // 預設狀態
+      currentTrain: null,
+      currentStation: null,
+      nextStation: null
+    };
+  }
+
   // 按順序檢查每個車次
   for (const trainNo of validSchedules) {
     try {
@@ -276,7 +311,7 @@ async function determineTrainStatus(
   // 根據時間判斷狀態
   if (!lastCompletedTrain && !nextUpcomingTrain) {
     return {
-      status: '機務段待發車',
+      status: '等待出車',
       currentTrain: null,
       currentStation: null,
       nextStation: null
@@ -294,7 +329,7 @@ async function determineTrainStatus(
 
   if (!lastCompletedTrain && nextUpcomingTrain) {
     return {
-      status: '機務段待發車',
+      status: '等待出車',
       currentTrain: nextUpcomingTrain.trainNo,
       currentStation: nextUpcomingTrain.firstStation,
       nextStation: null
@@ -302,7 +337,21 @@ async function determineTrainStatus(
   }
 
   // 在兩個車次之間
-  if (lastCompletedTrain) {  // 添加空值檢查
+  if (lastCompletedTrain) {
+    const timeSinceLastTrain = currentTime.getTime() - lastCompletedTrain.endTime.getTime();
+    const timeToNextTrain = new Date(currentTime.toDateString() + ' ' + nextUpcomingTrain!.startTime).getTime() - currentTime.getTime();
+    
+    // 如果距離下一班車還有很長時間，就是等待出車狀態
+    if (timeToNextTrain > 30 * 60 * 1000) { // 30分鐘
+      return {
+        status: '等待出車',
+        currentTrain: nextUpcomingTrain!.trainNo,
+        currentStation: nextUpcomingTrain!.firstStation,
+        nextStation: null
+      };
+    }
+    
+    // 否則是準備中狀態
     return {
       status: '準備中',
       currentTrain: lastCompletedTrain.trainNo,
@@ -313,11 +362,28 @@ async function determineTrainStatus(
 
   // 預設返回
   return {
-    status: '機務段待發車',
+    status: '等待出車',
     currentTrain: null,
     currentStation: null,
     nextStation: null
   };
+}
+
+// 添加一個新的輔助函數來找出下一個車次
+function findNextTrainNumber(currentTrainNo: string, dailySchedules: string[]): string | null {
+  // 先過濾出數字車次並排序
+  const validSchedules = dailySchedules
+    .filter(trainNo => /^\d+$/.test(trainNo))
+    .sort((a, b) => Number(a) - Number(b));
+
+  const currentIndex = validSchedules.indexOf(currentTrainNo);
+  
+  // 如果找到當前車次，且不是最後一個車次，則返回下一個車次
+  if (currentIndex !== -1 && currentIndex < validSchedules.length - 1) {
+    return validSchedules[currentIndex + 1];
+  }
+  
+  return null;
 }
 
 export async function updateTrainStatus(
@@ -325,12 +391,44 @@ export async function updateTrainStatus(
   currentTrainNo: string,
   dailySchedules: string[]
 ): Promise<void> {
-  // 獲取當前時間
   const now = new Date();
-  
-  // 確定列車狀態
   const status = await determineTrainStatus(dailySchedules, now);
   
+  // 取得預計到達和發車時間
+  let estimatedArrival = null;
+  let scheduledDeparture = null;
+  
+  if (status.currentTrain && status.currentStation) {
+    try {
+      // 獲取當前車次的時刻表
+      const scheduleData = await getTrainSchedule(status.currentTrain);
+      
+      // 找出當前站的時刻
+      const currentStationSchedule = scheduleData.stopTimes.find(
+        stop => stop.stationId === status.currentStation
+      );
+
+      if (currentStationSchedule) {
+        // 使用時刻表的到達和發車時間
+        estimatedArrival = currentStationSchedule.arrivalTime;
+        scheduledDeparture = currentStationSchedule.departureTime;
+        
+        // 獲取即時資訊以檢查誤點狀況
+        const liveData = await getTrainLive(status.currentTrain);
+        const { delayMap } = parseLiveData(status.currentTrain, liveData);
+        
+        // 如果有誤點，在時間後面加上說明
+        const delay = delayMap[status.currentStation] || 0;
+        if (delay > 0) {
+          estimatedArrival += ` (誤點${delay}分)`;
+          scheduledDeparture += ` (誤點${delay}分)`;
+        }
+      }
+    } catch (error) {
+      console.error('獲取時刻資訊失敗:', error);
+    }
+  }
+
   // 獲取車站名稱對照表
   const { data: stationDetails } = await supabase
     .from('train_station_details')
@@ -347,8 +445,11 @@ export async function updateTrainStatus(
     .update({
       status: status.status,
       current_train: status.currentTrain,
+      prepare_train: findNextTrainNumber(status.currentTrain || currentTrainNo, dailySchedules),
       current_station: status.currentStation ? stationMap[status.currentStation] : null,
-      next_station: status.nextStation ? stationMap[status.nextStation] : null
+      next_station: status.nextStation ? stationMap[status.nextStation] : null,
+      estimated_arrival: estimatedArrival,
+      scheduled_departure: scheduledDeparture
     })
     .eq('id', trainId);
 
