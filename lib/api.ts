@@ -483,12 +483,7 @@ export async function getTrainData() {
     throw error
   }
 
-  console.log('getTrainData: 查詢完成，檢查明日車次:', 
-    groups?.map(g => g.trains?.map(t => ({
-      trainId: t.id,
-      nextDayCount: t.next_day_schedules?.length || 0
-    })))
-  )
+  
 
   const { data: stationSchedules } = await supabase
     .from('station_schedules')
