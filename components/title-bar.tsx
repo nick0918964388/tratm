@@ -108,7 +108,7 @@ export function TitleBar({ onRefresh, refreshing, schedules }: TitleBarProps) {
       <div className="sticky top-0 z-50 border-b bg-white dark:bg-gray-800">
         <div className="flex h-14 items-center px-4">
           <Train className="mr-2 h-6 w-6" />
-          <h2 className="text-lg font-semibold">七堵機務段出車監控系統</h2>
+          <h2 className="text-lg font-semibold">車輛運用管理</h2>
           <div className="ml-auto flex items-center space-x-4">
             <Button
               variant="outline"
@@ -118,8 +118,7 @@ export function TitleBar({ onRefresh, refreshing, schedules }: TitleBarProps) {
               className={updating ? "animate-pulse" : ""}
             >
               <RefreshCw className={`h-4 w-4 ${updating ? "animate-spin" : ""}`} />
-            </Button>
-            {/* ... 其他按鈕 */}
+            </Button>            
           </div>
         </div>
       </div>

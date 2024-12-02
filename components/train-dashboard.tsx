@@ -559,10 +559,10 @@ export function TrainDashboard({ initialData }: DashboardProps) {
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <h2 className="text-2xl font-semibold tracking-tight">
-              即時控面板
+              即時24點報監控
             </h2>
             <p className="text-sm text-muted-foreground">
-              目監控中車輛：{allTrains.length} 輛
+              配置車輛：{allTrains.length} 輛
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -651,7 +651,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
             onClick={() => handleCardClick("臨修(C2)", "臨修(C2)")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">臨(C2)</CardTitle>
+              <CardTitle className="text-sm font-medium">臨修(C2)</CardTitle>
               <Wrench className="h-4 w-4 text-rose-500" />
             </CardHeader>
             <CardContent>
@@ -703,7 +703,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
         <Card className="bg-white dark:bg-gray-800">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>車輛運轉況</CardTitle>
+              <CardTitle>車輛運轉現況</CardTitle>
               <CardDescription>
                 即時顯示本日目前 七堵機務段 所有車的運行狀態與位置資訊
               </CardDescription>
