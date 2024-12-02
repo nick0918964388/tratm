@@ -1,7 +1,7 @@
 import { TrainDashboard } from "@/components/train-dashboard"
 import { Suspense } from "react"
 import { supabase } from "@/lib/supabase"
-import { Station, TrainGroup } from "@/types/train"
+import { Station, TrainGroup, Train } from "@/types/train"
 import { LoadingSpinner } from "@/components/loading"
 
 async function getTrainData() {

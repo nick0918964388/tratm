@@ -54,12 +54,24 @@ interface DashboardProps {
 }
 
 interface ProcessedTrain extends Train {
-  schedule: string[];
-  currentTrain: string;
-  prepareTrain: string;
+  schedules: string[];
+  current_train: string;
+  prepare_train: string;
+  current_station: string;
+  next_station: string;
+  scheduled_departure: string;
+  estimated_arrival: string;
   scheduleDetails: Array<{
     trainNumber: string;
-    stations: Station[];
+    stations: Array<{
+      name: string;
+      scheduledArrival: string;
+      scheduledDeparture: string;
+      actualArrival?: string;
+      actualDeparture?: string;
+      status: StationStatus;
+      delay?: number;
+    }>;
   }>;
 }
 
@@ -128,11 +140,11 @@ export function TrainDashboard({ initialData }: DashboardProps) {
   }, [])
 
   useEffect(() => {
-    // 設置實時訂閱
+    // 設置實閱
     const trainsSubscription = supabase
       .channel('trains-changes')
       .on(
-        'postgres_changes',
+        'postgres_changes' as any,
         {
           event: '*',
           schema: 'public',
@@ -163,10 +175,10 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                     ? {
                         ...train,
                         ...updatedTrainData,
-                        currentTrain: updatedTrainData.current_train,
-                        prepareTrain: updatedTrainData.prepare_train,
-                        currentStation: updatedTrainData.current_station,
-                        nextStation: updatedTrainData.next_station,
+                        current_train: updatedTrainData.current_train,
+                        prepare_train: updatedTrainData.prepare_train,
+                        current_station: updatedTrainData.current_station,
+                        next_station: updatedTrainData.next_station,
                         status: updatedTrainData.status,
                       }
                     : train
@@ -270,15 +282,14 @@ export function TrainDashboard({ initialData }: DashboardProps) {
     }
   }
 
-  const filterTrainGroups = (groups: TrainGroup[]) => {
+  const filterTrainGroups = (groups: ProcessedTrainGroup[]) => {
     return groups
       .map((group) => ({
         ...group,
-        trains: group.trains
+        trains: (group.trains || [])
           .filter((train) =>
             train.id.toLowerCase().includes(searchTerm.toLowerCase())
           )
-          // 添加排序邏輯
           .sort((a, b) => {
             // 先按照車型分類
             const typeA = a.id.match(/^[A-Za-z]+/)?.[0] || '';
@@ -293,20 +304,19 @@ export function TrainDashboard({ initialData }: DashboardProps) {
           })
       }))
       .filter((group) => group.trains.length > 0)
-      // 車組也按照 ID 排序
       .sort((a, b) => a.id.localeCompare(b.id));
   }
 
   const processTrainData = (trains: Train[]): ProcessedTrain[] => {
     return trains.map(train => ({
       ...train,
-      schedule: train.schedules?.map(schedule => schedule.train_number) || [],
-      currentTrain: train.current_train,
-      prepareTrain: train.prepare_train,
-      currentStation: train.current_station,
-      nextStation: train.next_station,
-      scheduledDeparture: train.scheduled_departure,
-      estimatedArrival: train.estimated_arrival,
+      schedules: train.schedules?.map(schedule => schedule.train_number) || [],
+      current_train: train.current_train,
+      prepare_train: train.prepare_train,
+      current_station: train.current_station,
+      next_station: train.next_station,
+      scheduled_departure: train.scheduled_departure,
+      estimated_arrival: train.estimated_arrival,
       scheduleDetails: train.station_schedules ? [{
         trainNumber: train.current_train,
         stations: train.station_schedules.map(s => ({
@@ -411,7 +421,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
       setExpandedSchedules({ 
         trainId, 
         trainNumber: trainNo,
-        stations: combinedStations
+        stations: combinedStations || []
       })
 
     } catch (error) {
@@ -422,7 +432,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
     }
   }
 
-  // 添加一個通用的卡片點擊處��函數
+  // 添加一個通用的卡片點擊處函數
   const handleCardClick = (status: string, title: string) => {
     const filteredTrains = allTrains
       .filter((t) => t.status === status)
@@ -437,7 +447,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
         const numA = parseInt(a.id.match(/\d+/)?.[0] || '0');
         const numB = parseInt(b.id.match(/\d+/)?.[0] || '0');
         return numA - numB;
-      });
+      }) as unknown as Train[];
 
     setSelectedStatus({
       title,
@@ -451,7 +461,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
       <TitleBar 
         onRefresh={handleRefresh} 
         refreshing={refreshing}
-        schedules={allTrains.flatMap(train => train.schedule)}
+        schedules={allTrains.flatMap(train => train.schedules)}
       />
       
       <div className="flex-1 space-y-4 p-4 md:p-8">
@@ -619,7 +629,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
         <Card className="bg-white dark:bg-gray-800">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>車輛運行狀況</CardTitle>
+              <CardTitle>���輛運行狀況</CardTitle>
               <CardDescription>
                 即時顯示所有車的運行狀態與位置資訊
               </CardDescription>
@@ -660,7 +670,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                           <TableRow>
                             <TableHead>車號</TableHead>
                             <TableHead>狀態</TableHead>
-                            <TableHead>目前車次</TableHead>
+                            <TableHead>目前次</TableHead>
                             <TableHead>下一車次</TableHead>
                             <TableHead>今日車次</TableHead>
                             <TableHead>目前車站</TableHead>
@@ -686,16 +696,16 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                                     {train.status}
                                   </Badge>
                                 </TableCell>
-                                <TableCell>{train.currentTrain}</TableCell>
-                                <TableCell>{train.prepareTrain || '-'}</TableCell>
+                                <TableCell>{train.current_train}</TableCell>
+                                <TableCell>{train.prepare_train || '-'}</TableCell>
                                 <TableCell>
                                   <div className="flex flex-wrap gap-1">
-                                    {train.schedule.map((num) => (
+                                    {train.schedules.map((num) => (
                                       <Badge
                                         key={num}
                                         variant="outline"
                                         className={`cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                                          train.currentTrain === num
+                                          train.current_train === num
                                             ? "bg-sky-50 dark:bg-sky-900/20"
                                             : ""
                                         } ${
@@ -720,11 +730,11 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                                     ))}
                                   </div>
                                 </TableCell>
-                                <TableCell>{train.currentStation}</TableCell>
-                                <TableCell>{train.nextStation}</TableCell>
-                                <TableCell>{train.estimatedArrival}</TableCell>
+                                <TableCell>{train.current_station}</TableCell>
+                                <TableCell>{train.next_station}</TableCell>
+                                <TableCell>{train.estimated_arrival}</TableCell>
                                 <TableCell>
-                                  {train.scheduledDeparture}
+                                  {train.scheduled_departure}
                                 </TableCell>
                                 <TableCell>{train.driver}</TableCell>
                               </TableRow>

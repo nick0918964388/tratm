@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { TrainDashboard } from '@/components/train-dashboard'
 import { supabase } from '@/lib/supabase'
+import { Station, TrainGroup } from '@/types/train'
 
 async function getTrainData() {
   const { data: groups } = await supabase
@@ -20,8 +21,8 @@ async function getTrainData() {
     .select('*')
 
   return {
-    groups,
-    stationSchedules
+    groups: (groups || []) as TrainGroup[],
+    stationSchedules: (stationSchedules || []) as Station[]
   }
 }
 

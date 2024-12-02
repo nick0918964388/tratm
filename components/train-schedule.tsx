@@ -20,7 +20,7 @@ interface TrainScheduleProps {
       actualDeparture?: string;
       status: "已過站" | "當前站" | "未到站";
       delay?: number;
-    }>;
+    }> | [];
   };
 }
 
