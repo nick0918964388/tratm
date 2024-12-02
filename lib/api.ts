@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { Train, TrainGroup, Station } from '@/types/train'
 
 export interface TrainStop {
   seq: number
@@ -94,7 +95,7 @@ export function parseLiveData(trainNo: string, data: TrainLiveData): {
     ? currentStationEntry[0].split('_')[1] 
     : ''
 
-  // 找出下一站 (stationLiveMap 中非 0 的站點)
+  // 找出下一站 (stationLiveMap 非 0 的站點)
   const nextStationEntry = Object.entries(data.stationLiveMap)
     .find(([key, value]) => {
       const [trainNumber, _] = key.split('_')
@@ -336,7 +337,7 @@ async function determineTrainStatus(
     };
   }
 
-  // 在兩個車次之間
+  // 兩個車次之間
   if (lastCompletedTrain) {
     const timeSinceLastTrain = currentTime.getTime() - lastCompletedTrain.endTime.getTime();
     const timeToNextTrain = new Date(currentTime.toDateString() + ' ' + nextUpcomingTrain!.startTime).getTime() - currentTime.getTime();
@@ -455,5 +456,46 @@ export async function updateTrainStatus(
 
   if (error) {
     throw error;
+  }
+}
+
+export async function getTrainData() {
+  console.log('getTrainData: 開始查詢...')
+  
+  const { data: groups, error } = await supabase
+    .from('train_groups')
+    .select(`
+      *,
+      trains:trains (
+        *,
+        schedules:train_schedules (*),
+        next_day_schedules:train_next_day_schedules (
+          id,
+          train_id,
+          train_number,
+          sequence
+        )
+      )
+    `)
+
+  if (error) {
+    console.error('getTrainData 查詢錯誤:', error)
+    throw error
+  }
+
+  console.log('getTrainData: 查詢完成，檢查明日車次:', 
+    groups?.map(g => g.trains?.map(t => ({
+      trainId: t.id,
+      nextDayCount: t.next_day_schedules?.length || 0
+    })))
+  )
+
+  const { data: stationSchedules } = await supabase
+    .from('station_schedules')
+    .select('*')
+
+  return {
+    groups: (groups || []) as TrainGroup[],
+    stationSchedules: (stationSchedules || []) as Station[]
   }
 } 

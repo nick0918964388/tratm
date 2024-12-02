@@ -1,7 +1,5 @@
 export type TrainStatus = 
   | '運行中' 
-  | '準備中' 
-  | '維修中' 
   | '等待出車' 
   | '已出車完畢'
   | '在段待修'
@@ -29,6 +27,15 @@ export interface TrainSchedule {
   is_current: boolean
 }
 
+export interface TrainNextDaySchedule {
+  id: number
+  train_id: string
+  train_number: string
+  sequence: number
+  created_at: string
+  updated_at: string
+}
+
 export interface Train {
   id: string
   group_id: string
@@ -42,11 +49,18 @@ export interface Train {
   prepare_train: string
   schedules?: TrainSchedule[]
   station_schedules?: Station[]
+  next_day_schedules?: TrainNextDaySchedule[]
 }
 
 export interface TrainGroup {
   id: string
   name: string
   trains?: Train[]
+}
+
+export interface ProcessedTrain extends Omit<Train, 'schedules'> {
+  schedules: string[];
+  next_day_schedules: TrainNextDaySchedule[];
+  // ... 其他屬性
 }
 

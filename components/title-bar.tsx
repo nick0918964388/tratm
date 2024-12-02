@@ -7,6 +7,7 @@ import { RefreshCw } from 'lucide-react'
 import { getTrainLive, getTrainSchedule, updateTrainStatus } from "@/lib/api"
 import { supabase } from '@/lib/supabase'
 import { useToast } from "@/hooks/use-toast"
+import { UpdateProgressModal } from "./update-progress-modal"
 
 interface TitleBarProps {
   onRefresh: () => void
@@ -16,17 +17,18 @@ interface TitleBarProps {
 
 export function TitleBar({ onRefresh, refreshing, schedules }: TitleBarProps) {
   const [updating, setUpdating] = useState(false)
+  const [updateProgress, setUpdateProgress] = useState({
+    totalTrains: 0,
+    updatedCount: 0,
+    currentTrain: '',
+    logs: [] as string[]
+  })
   const { toast } = useToast()
 
   const updateLiveData = async () => {
     try {
       setUpdating(true)
-      toast({
-        title: "更新資料中",
-        description: "正在獲取最新列車運行資訊...",
-        duration: 5000,
-      })
-
+      
       // 獲取所有列車
       const { data: trains } = await supabase
         .from('trains')
@@ -36,21 +38,22 @@ export function TitleBar({ onRefresh, refreshing, schedules }: TitleBarProps) {
         throw new Error('無法獲取列車資料')
       }
 
+      setUpdateProgress(prev => ({
+        ...prev,
+        totalTrains: trains.length,
+        updatedCount: 0,
+        logs: ['開始更新列車資料...']
+      }))
+
       let totalUpdated = 0
 
       // 使用 Promise.all 來並行處理所有更新
       await Promise.all(trains.map(async (train) => {
-        // 如果列車狀態是檢修相關的，就跳過更新
-        if ([
-          '在段待修', 
-          '臨修(C2)', 
-          '進廠檢修(3B)', 
-          '在段保養(2A)',
-          '預備'  // 新增這個狀態
-        ].includes(train.status)) {
-          console.log(`列車 ${train.id} 在檢修中或預備中，跳過更新`)
-          return
-        }
+        setUpdateProgress(prev => ({
+          ...prev,
+          currentTrain: train.id,
+          logs: [...prev.logs, `正在更新列車 ${train.id}...`]
+        }))
 
         try {
           const { data: schedules } = await supabase
@@ -66,8 +69,16 @@ export function TitleBar({ onRefresh, refreshing, schedules }: TitleBarProps) {
           const trainNumbers = schedules.map(s => s.train_number)
           await updateTrainStatus(train.id, train.current_train, trainNumbers)
           totalUpdated++
+          setUpdateProgress(prev => ({
+            ...prev,
+            updatedCount: totalUpdated,
+            logs: [...prev.logs, `列車 ${train.id} 更新完成`]
+          }))
         } catch (error) {
-          console.error(`更新列車 ${train.id} 失敗:`, error)
+          setUpdateProgress(prev => ({
+            ...prev,
+            logs: [...prev.logs, `列車 ${train.id} 更新失敗: ${error}`]
+          }))
         }
       }))
 
@@ -93,23 +104,30 @@ export function TitleBar({ onRefresh, refreshing, schedules }: TitleBarProps) {
   }
 
   return (
-    <div className="sticky top-0 z-50 border-b bg-white dark:bg-gray-800">
-      <div className="flex h-14 items-center px-4">
-        <Train className="mr-2 h-6 w-6" />
-        <h2 className="text-lg font-semibold">七堵機務段出車監控系統</h2>
-        <div className="ml-auto flex items-center space-x-4">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={updateLiveData}
-            disabled={updating}
-            className={updating ? "animate-pulse" : ""}
-          >
-            <RefreshCw className={`h-4 w-4 ${updating ? "animate-spin" : ""}`} />
-          </Button>
-          {/* ... 其他按鈕 */}
+    <>
+      <div className="sticky top-0 z-50 border-b bg-white dark:bg-gray-800">
+        <div className="flex h-14 items-center px-4">
+          <Train className="mr-2 h-6 w-6" />
+          <h2 className="text-lg font-semibold">七堵機務段出車監控系統</h2>
+          <div className="ml-auto flex items-center space-x-4">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={updateLiveData}
+              disabled={updating}
+              className={updating ? "animate-pulse" : ""}
+            >
+              <RefreshCw className={`h-4 w-4 ${updating ? "animate-spin" : ""}`} />
+            </Button>
+            {/* ... 其他按鈕 */}
+          </div>
         </div>
       </div>
-    </div>
+      <UpdateProgressModal
+        isOpen={updating}
+        onClose={() => setUpdating(false)}
+        {...updateProgress}
+      />
+    </>
   )
 } 

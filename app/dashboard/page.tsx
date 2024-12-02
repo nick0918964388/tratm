@@ -1,34 +1,11 @@
 import { Suspense } from 'react'
 import { TrainDashboard } from '@/components/train-dashboard'
-import { supabase } from '@/lib/supabase'
-import { Station, TrainGroup } from '@/types/train'
-
-async function getTrainData() {
-  const { data: groups } = await supabase
-    .from('train_groups')
-    .select(`
-      *,
-      trains:trains (
-        *,
-        schedules:train_schedules (
-          *
-        )
-      )
-    `)
-
-  const { data: stationSchedules } = await supabase
-    .from('station_schedules')
-    .select('*')
-
-  return {
-    groups: (groups || []) as TrainGroup[],
-    stationSchedules: (stationSchedules || []) as Station[]
-  }
-}
+import { getTrainData } from '@/lib/api'
 
 export default async function DashboardPage() {
+  console.log('開始獲取初始資料...')
   const data = await getTrainData()
-  
+  console.log('初始資料:', data)
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <TrainDashboard initialData={data} />
