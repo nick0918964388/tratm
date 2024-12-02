@@ -744,7 +744,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                                     <TrainScheduleDetail
                                       schedule={{
                                         trainNumber: selectedSchedule.no,
-                                        stations: expandedSchedules.stations  // 使用合併後的站點資訊
+                                        stations: expandedSchedules.stations || []
                                       }}
                                     />
                                   </TableCell>
