@@ -38,7 +38,7 @@ import {
 } from 'lucide-react'
 
 import { TrainScheduleDetail } from "@/components/train-schedule"
-import { Train, TrainGroup, Station, TrainNextDaySchedule } from "@/types/train"
+import { Train, TrainGroup, Station, TrainNextDaySchedule, TrainSchedule } from "@/types/train"
 import { TitleBar } from "@/components/title-bar"
 import { format } from "date-fns"
 import { zhTW } from "date-fns/locale"
@@ -190,7 +190,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                       const processedTrain: ProcessedTrain = {
                         ...train,
                         ...updatedTrainData,
-                        schedules: updatedTrainData.schedules?.map(s => s.train_number) || [],
+                        schedules: updatedTrainData.schedules?.map((s: TrainSchedule) => s.train_number) || [],
                         current_train: updatedTrainData.current_train,
                         prepare_train: updatedTrainData.prepare_train,
                         current_station: updatedTrainData.current_station,
@@ -200,7 +200,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                         next_day_schedules: updatedTrainData.next_day_schedules || [],
                         scheduleDetails: updatedTrainData.station_schedules ? [{
                           trainNumber: updatedTrainData.current_train,
-                          stations: updatedTrainData.station_schedules.map(s => ({
+                          stations: updatedTrainData.station_schedules.map((s: Station) => ({
                             name: s.station_name,
                             scheduledArrival: s.scheduled_arrival,
                             scheduledDeparture: s.scheduled_departure,
@@ -473,7 +473,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
     }
   }
 
-  // 添加一個通用的卡片點擊處函數
+  // 添加一個通用的卡片點擊處���數
   const handleCardClick = (status: string, title: string) => {
     const filteredTrains = allTrains
       .filter((t) => t.status === status)
