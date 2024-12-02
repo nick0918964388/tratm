@@ -53,7 +53,7 @@ interface DashboardProps {
   }
 }
 
-interface ProcessedTrain extends Train {
+interface ProcessedTrain extends Omit<Train, 'schedules'> {
   schedules: string[];
   current_train: string;
   prepare_train: string;
@@ -69,7 +69,7 @@ interface ProcessedTrain extends Train {
       scheduledDeparture: string;
       actualArrival?: string;
       actualDeparture?: string;
-      status: StationStatus;
+      status: "已過站" | "當前站" | "未到站";
       delay?: number;
     }>;
   }>;
@@ -629,7 +629,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
         <Card className="bg-white dark:bg-gray-800">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>���輛運行狀況</CardTitle>
+              <CardTitle>輛運行狀況</CardTitle>
               <CardDescription>
                 即時顯示所有車的運行狀態與位置資訊
               </CardDescription>
