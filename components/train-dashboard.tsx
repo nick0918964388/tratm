@@ -36,7 +36,7 @@ import {
   ChevronRight,
   Wrench
 } from 'lucide-react'
-import { trainGroups } from "@/data/trains"
+
 import { TrainScheduleDetail } from "@/components/train-schedule"
 import { Train, TrainGroup, Station } from "@/types/train"
 import { TitleBar } from "@/components/title-bar"
