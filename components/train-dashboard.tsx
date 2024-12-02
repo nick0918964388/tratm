@@ -341,7 +341,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
       console.log(`處理列車 ${train.id} 的資料`)
       const processed = {
         ...train,
-        schedules: train.schedules?.map(schedule => schedule.train_number) || [],
+        schedules: train.schedules?.map((s: TrainSchedule) => s.train_number) || [],
         current_train: train.current_train,
         prepare_train: train.prepare_train,
         current_station: train.current_station,
@@ -351,7 +351,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
         next_day_schedules: train.next_day_schedules || [],
         scheduleDetails: train.station_schedules ? [{
           trainNumber: train.current_train,
-          stations: train.station_schedules.map(s => ({
+          stations: train.station_schedules.map((s: Station) => ({
             name: s.station_name,
             scheduledArrival: s.scheduled_arrival,
             scheduledDeparture: s.scheduled_departure,
