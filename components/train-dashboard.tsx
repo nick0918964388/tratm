@@ -509,8 +509,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
             next_day_schedules:train_next_day_schedules (*)
           )
         `)
-      console.log('獲取到的資料:', groups)
-      console.log('明日車次資料:', groups?.map(g => g.trains?.map(t => t.next_day_schedules)))
+      console.log('獲取到的資料:', groups)      
     }
     fetchData()
   }, [])
