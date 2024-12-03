@@ -1035,7 +1035,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                               <TableHead>今日車次</TableHead>
                               <TableHead>明日車次</TableHead>
                               <TableHead className="bg-blue-100/50 dark:bg-blue-950/40">起始站</TableHead>
-                              <TableHead className="bg-blue-100/50 dark:bg-blue-950/40">始發時��</TableHead>
+                              <TableHead className="bg-blue-100/50 dark:bg-blue-950/40">始發時刻</TableHead>
                               <TableHead className="bg-green-100/50 dark:bg-green-950/40">目前車站</TableHead>
                               <TableHead className="bg-green-100/50 dark:bg-green-950/40">下一站</TableHead>
                               <TableHead className="bg-green-100/50 dark:bg-green-950/40">預計到達時間</TableHead>
