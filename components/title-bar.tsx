@@ -8,12 +8,11 @@ import { updateTrainStatus } from "@/lib/api"
 import { supabase } from '@/lib/supabase'
 import { useToast } from "@/hooks/use-toast"
 import { UpdateProgressModal } from "./update-progress-modal"
-import { TrainSchedule } from "@/types/train"
 
 interface TitleBarProps {
   onRefresh: () => void
   refreshing: boolean
-  schedules: TrainSchedule[]
+  schedules: string[]
 }
 
 export function TitleBar({ onRefresh, refreshing, schedules }: TitleBarProps) {
