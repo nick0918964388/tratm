@@ -4,10 +4,11 @@ import { useState } from 'react'
 import { Train } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { RefreshCw } from 'lucide-react'
-import { getTrainLive, getTrainSchedule, updateTrainStatus } from "@/lib/api"
+import { updateTrainStatus } from "@/lib/api"
 import { supabase } from '@/lib/supabase'
 import { useToast } from "@/hooks/use-toast"
 import { UpdateProgressModal } from "./update-progress-modal"
+import { TrainSchedule } from "@/types/train"
 
 interface TitleBarProps {
   onRefresh: () => void
