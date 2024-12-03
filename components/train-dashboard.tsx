@@ -685,7 +685,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
       if (a[key] === null || a[key] === undefined) return 1;
       if (b[key] === null || b[key] === undefined) return -1;
       
-      // 特殊處理狀態排序
+      // 特殊處���狀態排序
       if (key === 'status') {
         const statusOrder: { [key: string]: number } = {
           '運行中': 1,
@@ -804,7 +804,10 @@ export function TrainDashboard({ initialData }: DashboardProps) {
           console.log(`獲取新資料: ${cacheKey}`);
           const data = await getTrainSchedule(schedule.train_number);
           const scheduleData = {
-            departure_time: data.startingTime || '99:99'
+            departure_time: data.startingTime || '99:99',
+            start_station: `${data.startingStationName}(${data.stopTimes[0]?.stationId || ''})` || '-',
+            end_station: `${data.endingStationName}(${data.stopTimes[data.stopTimes.length - 1]?.stationId || ''})` || '-',
+            arrival_time: data.endingTime || '-'
           };
 
           scheduleCache.set(cacheKey, {
@@ -866,7 +869,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
       <TitleBar 
         onRefresh={handleRefresh} 
         refreshing={refreshing}
-        schedules={allTrains.flatMap(train => train.schedules)}
+        schedules={allTrains.flatMap(train => train.schedules.map(s => s.train_number))}
       />
       
       <div className="flex-1 space-y-4 p-4 md:p-8">
@@ -1032,7 +1035,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                               <TableHead>今日車次</TableHead>
                               <TableHead>明日車次</TableHead>
                               <TableHead className="bg-blue-100/50 dark:bg-blue-950/40">起始站</TableHead>
-                              <TableHead className="bg-blue-100/50 dark:bg-blue-950/40">始發時間</TableHead>
+                              <TableHead className="bg-blue-100/50 dark:bg-blue-950/40">始發時��</TableHead>
                               <TableHead className="bg-green-100/50 dark:bg-green-950/40">目前車站</TableHead>
                               <TableHead className="bg-green-100/50 dark:bg-green-950/40">下一站</TableHead>
                               <TableHead className="bg-green-100/50 dark:bg-green-950/40">預計到達時間</TableHead>

@@ -12,7 +12,7 @@ import { UpdateProgressModal } from "./update-progress-modal"
 interface TitleBarProps {
   onRefresh: () => void
   refreshing: boolean
-  schedules: string[]  // 添加所有車次清單
+  schedules: TrainSchedule[]
 }
 
 export function TitleBar({ onRefresh, refreshing, schedules }: TitleBarProps) {
