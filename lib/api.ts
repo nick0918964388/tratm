@@ -2,10 +2,11 @@ import { supabase } from '@/lib/supabase'
 import { Train, TrainGroup, Station } from '@/types/train'
 
 export interface TrainStop {
-  seq: number
-  stationId: string
-  arrivalTime: string
-  departureTime: string
+  seq: number;
+  stationId: string;
+  stationName: string;
+  arrivalTime: string;
+  departureTime: string;
 }
 
 export interface TrainDetail {

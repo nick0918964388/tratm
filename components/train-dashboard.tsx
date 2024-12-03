@@ -54,7 +54,7 @@ interface DashboardProps {
 }
 
 interface ProcessedTrain extends Omit<Train, 'schedules'> {
-  schedules: string[];
+  schedules: TrainSchedule[];
   current_train: string;
   prepare_train: string;
   current_station: string;
@@ -100,6 +100,164 @@ interface DatabaseChangesPayload {
   table: string;
 }
 
+// 在 TrainDashboard 組件外部定義快取
+const scheduleCache = new Map<string, {
+  data: {
+    departure_time: string;
+    start_station: string;
+    end_station: string;
+    arrival_time: string;
+  };
+  timestamp: number;
+}>();
+
+// 首先創建一個新的 TrainRow 組件
+const TrainRow = ({ 
+  train, 
+  expandedSchedules, 
+  expandedGroups,
+  groupId,
+  loadingSchedule, 
+  handleScheduleClick,
+  selectedSchedule,
+  getStatusColor,
+  sortTrainNumbers
+}: {
+  train: ProcessedTrain;
+  expandedSchedules: any;
+  expandedGroups: string[];
+  groupId: string;
+  loadingSchedule: boolean;
+  handleScheduleClick: (trainId: string, trainNo: string) => void;
+  selectedSchedule: TrainDetail | null;
+  getStatusColor: (status: string) => string;
+  sortTrainNumbers: (schedules: TrainSchedule[], nextDaySchedules: TrainNextDaySchedule[]) => Promise<any>;
+}) => {
+  const [sortedScheduleInfo, setSortedScheduleInfo] = useState<{
+    todaySchedules: TrainSchedule[];
+    firstSchedule: TrainSchedule | null;
+    lastSchedule: TrainSchedule | null;
+    nextDaySchedules: TrainNextDaySchedule[];
+  }>({
+    todaySchedules: train.schedules || [],
+    firstSchedule: null,
+    lastSchedule: null,
+    nextDaySchedules: train.next_day_schedules || []
+  });
+
+  useEffect(() => {
+    if (expandedGroups.includes(groupId)) {
+      const sortSchedules = async () => {
+        try {
+          const scheduleInfo = await sortTrainNumbers(
+            train.schedules || [], 
+            train.next_day_schedules || []
+          );
+          setSortedScheduleInfo(scheduleInfo);
+        } catch (error) {
+          console.error('排序車次失敗:', error);
+        }
+      };
+      sortSchedules();
+    }
+  }, [train.schedules, train.next_day_schedules, expandedGroups, groupId]);
+
+  return (
+    <React.Fragment>
+      <TableRow>
+        <TableCell className="font-medium">{train.id}</TableCell>
+        <TableCell>
+          <Badge className={`${getStatusColor(train.status)} text-white`}>
+            {train.status}
+          </Badge>
+        </TableCell>
+        <TableCell>
+          <div className="flex flex-wrap gap-1">
+            {sortedScheduleInfo.todaySchedules.map((schedule) => (
+              <Badge
+                key={schedule.train_number}
+                variant="outline"
+                className={`cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                  train.current_train === schedule.train_number
+                    ? "bg-sky-500 text-white dark:bg-sky-600"
+                    : ""
+                } ${
+                  expandedSchedules?.trainId === train.id &&
+                  expandedSchedules?.trainNumber === schedule.train_number
+                    ? "ring-2 ring-sky-500"
+                    : ""
+                }`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleScheduleClick(train.id, schedule.train_number);
+                }}
+              >
+                {loadingSchedule && 
+                 expandedSchedules?.trainId === train.id && 
+                 expandedSchedules?.trainNumber === schedule.train_number 
+                  ? "載入中..." 
+                  : schedule.train_number
+                }
+              </Badge>
+            ))}
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="flex flex-wrap gap-1">
+            {sortedScheduleInfo.nextDaySchedules?.map((schedule) => (
+              <Badge 
+                key={schedule.train_number} 
+                variant="outline"
+                className="bg-gray-50 dark:bg-gray-800"
+              >
+                {schedule.train_number}
+              </Badge>
+            ))}
+          </div>
+        </TableCell>
+        <TableCell className="bg-blue-100/30 dark:bg-blue-950/10">
+          {sortedScheduleInfo.firstSchedule?.start_station || '-'}
+        </TableCell>
+        <TableCell className="bg-blue-100/30 dark:bg-blue-950/10">
+          {sortedScheduleInfo.firstSchedule?.departure_time || '-'}
+        </TableCell>
+        <TableCell className="bg-green-100/30 dark:bg-green-950/10">
+          {train.current_station}
+        </TableCell>
+        <TableCell className="bg-green-100/30 dark:bg-green-950/10">
+          {train.next_station}
+        </TableCell>
+        <TableCell className="bg-green-100/30 dark:bg-green-950/10">
+          {train.estimated_arrival}
+        </TableCell>
+        <TableCell className="bg-green-100/30 dark:bg-green-950/10">
+          {train.scheduled_departure}
+        </TableCell>
+        <TableCell className="bg-purple-100/30 dark:bg-purple-950/10">
+          {sortedScheduleInfo.lastSchedule?.end_station || '-'}
+        </TableCell>
+        <TableCell className="bg-purple-100/30 dark:bg-purple-950/10">
+          {sortedScheduleInfo.lastSchedule?.arrival_time || '-'}
+        </TableCell>
+        <TableCell>{train.driver}</TableCell>
+      </TableRow>
+      {expandedSchedules?.trainId === train.id && selectedSchedule && (
+        <TableRow>
+          <TableCell colSpan={9} className="p-0">
+            <TrainScheduleDetail
+              schedule={{
+                trainNumber: selectedSchedule.no,
+                stations: expandedSchedules.stations || []
+              }}
+            />
+          </TableCell>
+        </TableRow>
+      )}
+    </React.Fragment>
+  );
+};
+
 export function TrainDashboard({ initialData }: DashboardProps) {
   // console.log('TrainDashboard 初始化')
   // console.log('接收到初始資料:', initialData)
@@ -107,7 +265,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [refreshing, setRefreshing] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<string[]>(() => 
-    ['EMU3000', 'EMU900', 'E1000', 'PP', 'DR']  // 預設展開的車型列表
+    []  // 預設展開的車型列表
   )
   const [expandedSchedules, setExpandedSchedules] = useState<{
     trainId: string;
@@ -134,7 +292,10 @@ export function TrainDashboard({ initialData }: DashboardProps) {
   const [sortConfig, setSortConfig] = useState<{
     key: string;
     direction: 'asc' | 'desc';
-  } | null>(null);
+  }>({
+    key: 'status',
+    direction: 'asc'
+  });
 
   useEffect(() => {
     // 立即更新一次時間，確保客戶端和服務器端同步
@@ -241,7 +402,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
         }, {} as { [key: string]: string })
         setStationMap(map)
       } catch (error) {
-        console.error('獲取車站資訊失敗:', error)
+        console.error('獲:', error)
       }
     }
     loadStationDetails()
@@ -291,7 +452,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
         return "bg-sky-500"
       case "等待出車":
         return "bg-yellow-500"
-      case "已出車完畢":
+      case "出車完畢":
         return "bg-gray-500"
       case "維修中":
       case "在段待修":
@@ -341,16 +502,16 @@ export function TrainDashboard({ initialData }: DashboardProps) {
       console.log(`處理列車 ${train.id} 的資料`)
       const processed = {
         ...train,
-        schedules: train.schedules?.map((s: TrainSchedule) => s.train_number) || [],
-        current_train: train.current_train,
-        prepare_train: train.prepare_train,
-        current_station: train.current_station,
-        next_station: train.next_station,
-        scheduled_departure: train.scheduled_departure,
-        estimated_arrival: train.estimated_arrival,
+        schedules: train.schedules || [],  // 確保有預設值
+        current_train: train.current_train || '',  // 確保有預設值
+        prepare_train: train.prepare_train || '',
+        current_station: train.current_station || '',
+        next_station: train.next_station || '',
+        scheduled_departure: train.scheduled_departure || '',
+        estimated_arrival: train.estimated_arrival || '',
         next_day_schedules: train.next_day_schedules || [],
         scheduleDetails: train.station_schedules ? [{
-          trainNumber: train.current_train,
+          trainNumber: train.current_train || '',
           stations: train.station_schedules.map((s: Station) => ({
             name: s.station_name,
             scheduledArrival: s.scheduled_arrival,
@@ -390,7 +551,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
 
   const handleScheduleClick = async (trainId: string, trainNo: string) => {
     try {
-      // 如果已經展開，就關閉
+      // 如果已經展，就關閉
       if (expandedSchedules?.trainId === trainId && expandedSchedules?.trainNumber === trainNo) {
         setExpandedSchedules(null)
         return
@@ -473,10 +634,15 @@ export function TrainDashboard({ initialData }: DashboardProps) {
     }
   }
 
-  // 添加一個通用的卡片點擊處���數
+  // 添加一個通用的卡片點擊處數
   const handleCardClick = (status: string, title: string) => {
     const filteredTrains = allTrains
-      .filter((t) => t.status === status)
+      .filter((t) => {
+        if (status === "維修中") {
+          return ["段待修", "臨修(C2)", "進廠檢修(3B)", "在段保養(2A)"].includes(t.status);
+        }
+        return t.status === status;
+      })
       .sort((a, b) => {
         // 先按照車型分類
         const typeA = a.id.match(/^[A-Za-z]+/)?.[0] || '';
@@ -519,6 +685,28 @@ export function TrainDashboard({ initialData }: DashboardProps) {
       if (a[key] === null || a[key] === undefined) return 1;
       if (b[key] === null || b[key] === undefined) return -1;
       
+      // 特殊處理狀態排序
+      if (key === 'status') {
+        const statusOrder: { [key: string]: number } = {
+          '運行中': 1,
+          '等待出車': 2,
+          '已出車完畢': 3,
+          '預備': 4,
+          '在段待修': 5,
+          '臨修(C2)': 6,
+          '進廠檢修(3B)': 7,
+          '在段保養(2A)': 8
+        };
+        
+        const orderA = statusOrder[a[key] as string] || 999;
+        const orderB = statusOrder[b[key] as string] || 999;
+        
+        if (direction === 'asc') {
+          return orderA - orderB;
+        }
+        return orderB - orderA;
+      }
+      
       // 特殊處理車號排序
       if (key === 'id') {
         const typeA = a.id.match(/^[A-Za-z]+/)?.[0] || '';
@@ -545,6 +733,132 @@ export function TrainDashboard({ initialData }: DashboardProps) {
       direction = 'desc';
     }
     setSortConfig({ key, direction });
+  };
+
+  // 修改 sortTrainNumbers 函數，加入快取機制
+  const sortTrainNumbers = async (schedules: TrainSchedule[], nextDaySchedules: TrainNextDaySchedule[]) => {
+    try {
+      // 處理今日車次
+      const schedulePromises = schedules.map(async (schedule) => {
+        try {
+          const cacheKey = schedule.train_number;
+          const now = Date.now();
+          const cached = scheduleCache.get(cacheKey);
+          
+          // 如果快取存在且未過期（5分鐘）
+          if (cached && (now - cached.timestamp) < 5 * 60 * 1000) {
+            console.log(`使用快取資料: ${cacheKey}`);
+            return {
+              ...schedule,
+              ...cached.data
+            };
+          }
+
+          // 如果沒有快取或已過期，則獲取新資料
+          console.log(`獲取新資料: ${cacheKey}`);
+          const data = await getTrainSchedule(schedule.train_number);
+          const scheduleData = {
+            departure_time: data.startingTime || '99:99',
+            start_station: `${data.startingStationName}(${data.stopTimes[0]?.stationId || ''})` || '-',
+            end_station: `${data.endingStationName}(${data.stopTimes[data.stopTimes.length - 1]?.stationId || ''})` || '-',
+            arrival_time: data.endingTime || '-'
+          };
+
+          // 儲存到快取
+          scheduleCache.set(cacheKey, {
+            data: scheduleData,
+            timestamp: now
+          });
+
+          return {
+            ...schedule,
+            ...scheduleData
+          };
+        } catch (error) {
+          console.error(`獲取車次 ${schedule.train_number} 時刻表失敗:`, error);
+          return {
+            ...schedule,
+            departure_time: '99:99',
+            start_station: '-',
+            end_station: '-',
+            arrival_time: '-'
+          };
+        }
+      });
+
+      // 處理明日車次
+      const nextDaySchedulePromises = nextDaySchedules.map(async (schedule) => {
+        try {
+          const cacheKey = `next_${schedule.train_number}`;
+          const now = Date.now();
+          const cached = scheduleCache.get(cacheKey);
+          
+          if (cached && (now - cached.timestamp) < 5 * 60 * 1000) {
+            console.log(`使用快取資料: ${cacheKey}`);
+            return {
+              ...schedule,
+              ...cached.data
+            };
+          }
+
+          console.log(`獲取新資料: ${cacheKey}`);
+          const data = await getTrainSchedule(schedule.train_number);
+          const scheduleData = {
+            departure_time: data.startingTime || '99:99'
+          };
+
+          scheduleCache.set(cacheKey, {
+            data: scheduleData,
+            timestamp: now
+          });
+
+          return {
+            ...schedule,
+            ...scheduleData
+          };
+        } catch (error) {
+          console.error(`獲取明日車次 ${schedule.train_number} 時刻表失敗:`, error);
+          return {
+            ...schedule,
+            departure_time: '99:99'
+          };
+        }
+      });
+
+      // 等待所有請求完成
+      const [schedulesWithTime, nextDaySchedulesWithTime] = await Promise.all([
+        Promise.all(schedulePromises),
+        Promise.all(nextDaySchedulePromises)
+      ]);
+
+      // 根據發車時間排序
+      const sortedSchedules = schedulesWithTime.sort((a, b) => {
+        const timeA = a.departure_time || '99:99';
+        const timeB = b.departure_time || '99:99';
+        return timeA.localeCompare(timeB);
+      });
+
+      const sortedNextDaySchedules = nextDaySchedulesWithTime.sort((a, b) => {
+        const timeA = a.departure_time || '99:99';
+        const timeB = b.departure_time || '99:99';
+        return timeA.localeCompare(timeB);
+      });
+
+      return {
+        todaySchedules: sortedSchedules,
+        firstSchedule: sortedSchedules[0] || null,
+        lastSchedule: sortedSchedules[sortedSchedules.length - 1] || null,
+        nextDaySchedules: sortedNextDaySchedules
+      };
+    } catch (error) {
+      console.error('排序車次時發生錯誤:', error);
+      return {
+        todaySchedules: schedules,
+        firstSchedule: null,
+        lastSchedule: null,
+        nextDaySchedules: nextDaySchedules
+      };
+    }
   };
 
   return (
@@ -631,69 +945,20 @@ export function TrainDashboard({ initialData }: DashboardProps) {
           </Card>
           <Card 
             className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => handleCardClick("在段待修", "在段待修")}
+            onClick={() => handleCardClick("維修中", "維修中車輛")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">在段待修</CardTitle>
+              <CardTitle className="text-sm font-medium">維修中車輛</CardTitle>
               <Wrench className="h-4 w-4 text-rose-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {allTrains.filter((t) => t.status === "在段待修").length}
+                {allTrains.filter((t) => 
+                  ["在段待修", "臨修(C2)", "進廠檢修(3B)", "在段保養(2A)"].includes(t.status)
+                ).length}
               </div>
               <p className="text-xs text-muted-foreground">
-                在段待修的車輛數量
-              </p>
-            </CardContent>
-          </Card>
-          <Card 
-            className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => handleCardClick("臨修(C2)", "臨修(C2)")}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">臨修(C2)</CardTitle>
-              <Wrench className="h-4 w-4 text-rose-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {allTrains.filter((t) => t.status === "臨修(C2)").length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                臨修中的車輛數量
-              </p>
-            </CardContent>
-          </Card>
-          <Card 
-            className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => handleCardClick("進廠檢修(3B)", "進廠檢修(3B)")}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">進廠檢修(3B)</CardTitle>
-              <Wrench className="h-4 w-4 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {allTrains.filter((t) => t.status === "進廠檢修(3B)").length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                進廠檢修的車輛數量
-              </p>
-            </CardContent>
-          </Card>
-          <Card 
-            className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => handleCardClick("在段保養(2A)", "在段保養(2A)")}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">在段保養(2A)</CardTitle>
-              <Wrench className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {allTrains.filter((t) => t.status === "在段保養(2A)").length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                在段保養的車輛數量
+                所有維修保養中的車輛數量
               </p>
             </CardContent>
           </Card>
@@ -764,112 +1029,33 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                                   <span>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
                                 )}
                               </TableHead>
-                              <TableHead 
-                                className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                                onClick={() => handleSort('current_train')}
-                              >
-                                目前車次 {sortConfig?.key === 'current_train' && (
-                                  <span>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                                )}
-                              </TableHead>
-                              <TableHead>下一車次</TableHead>
                               <TableHead>今日車次</TableHead>
                               <TableHead>明日車次</TableHead>
-                              <TableHead>目前車站</TableHead>
-                              <TableHead>下一站</TableHead>
-                              <TableHead>預計到達時間</TableHead>
-                              <TableHead>預計發車時間</TableHead>
+                              <TableHead className="bg-blue-100/50 dark:bg-blue-950/40">起始站</TableHead>
+                              <TableHead className="bg-blue-100/50 dark:bg-blue-950/40">始發時間</TableHead>
+                              <TableHead className="bg-green-100/50 dark:bg-green-950/40">目前車站</TableHead>
+                              <TableHead className="bg-green-100/50 dark:bg-green-950/40">下一站</TableHead>
+                              <TableHead className="bg-green-100/50 dark:bg-green-950/40">預計到達時間</TableHead>
+                              <TableHead className="bg-green-100/50 dark:bg-green-950/40">預計發車時間</TableHead>
+                              <TableHead className="bg-purple-100/50 dark:bg-purple-950/40">終點站</TableHead>
+                              <TableHead className="bg-purple-100/50 dark:bg-purple-950/40">終點站時間</TableHead>
                               <TableHead>司機員</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {sortedTrains.map((train) => (
-                              <React.Fragment key={train.id}>
-                                <TableRow>
-                                  <TableCell className="font-medium">
-                                    {train.id}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge
-                                      className={`${getStatusColor(
-                                        train.status
-                                      )} text-white`}
-                                    >
-                                      {train.status}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>{train.current_train}</TableCell>
-                                  <TableCell>{train.prepare_train || '-'}</TableCell>
-                                  <TableCell>
-                                    <div className="flex flex-wrap gap-1">
-                                      {train.schedules.map((num) => (
-                                        <Badge
-                                          key={num}
-                                          variant="outline"
-                                          className={`cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                                            train.current_train === num
-                                              ? "bg-sky-50 dark:bg-sky-900/20"
-                                              : ""
-                                          } ${
-                                            expandedSchedules?.trainId === train.id &&
-                                            expandedSchedules?.trainNumber === num
-                                              ? "ring-1 ring-sky-500"
-                                              : ""
-                                          }`}
-                                          onClick={(e) => {
-                                            e.preventDefault()
-                                            e.stopPropagation()
-                                            handleScheduleClick(train.id, num)
-                                          }}
-                                        >
-                                          {loadingSchedule && 
-                                           expandedSchedules?.trainId === train.id && 
-                                           expandedSchedules?.trainNumber === num 
-                                            ? "載入中..." 
-                                            : num
-                                          }
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex flex-wrap gap-1">
-                                      {train.next_day_schedules && train.next_day_schedules.length > 0 ? (
-                                        train.next_day_schedules.map((schedule) => (
-                                          <Badge 
-                                            key={schedule.train_number} 
-                                            variant="outline"
-                                            className="bg-gray-50 dark:bg-gray-800"
-                                          >
-                                            {schedule.train_number}
-                                          </Badge>
-                                        ))
-                                      ) : (
-                                        <span className="text-gray-500">-</span>
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>{train.current_station}</TableCell>
-                                  <TableCell>{train.next_station}</TableCell>
-                                  <TableCell>{train.estimated_arrival}</TableCell>
-                                  <TableCell>
-                                    {train.scheduled_departure}
-                                  </TableCell>
-                                  <TableCell>{train.driver}</TableCell>
-                                </TableRow>
-                                {expandedSchedules?.trainId === train.id && selectedSchedule && (
-                                  <TableRow>
-                                    <TableCell colSpan={9} className="p-0">
-                                      <TrainScheduleDetail
-                                        schedule={{
-                                          trainNumber: selectedSchedule.no,
-                                          stations: expandedSchedules.stations || []
-                                        }}
-                                      />
-                                    </TableCell>
-                                  </TableRow>
-                                )}
-                              </React.Fragment>
+                              <TrainRow
+                                key={train.id}
+                                train={train}
+                                expandedSchedules={expandedSchedules}
+                                expandedGroups={expandedGroups}
+                                groupId={group.id}
+                                loadingSchedule={loadingSchedule}
+                                handleScheduleClick={handleScheduleClick}
+                                selectedSchedule={selectedSchedule}
+                                getStatusColor={getStatusColor}
+                                sortTrainNumbers={sortTrainNumbers}
+                              />
                             ))}
                           </TableBody>
                         </Table>

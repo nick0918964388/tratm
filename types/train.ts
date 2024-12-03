@@ -25,6 +25,10 @@ export interface TrainSchedule {
   train_id: string
   train_number: string
   is_current: boolean
+  departure_time?: string
+  start_station?: string
+  end_station?: string
+  arrival_time?: string
 }
 
 export interface TrainNextDaySchedule {
@@ -34,6 +38,7 @@ export interface TrainNextDaySchedule {
   sequence: number
   created_at: string
   updated_at: string
+  departure_time?: string
 }
 
 export interface Train {
@@ -59,8 +64,25 @@ export interface TrainGroup {
 }
 
 export interface ProcessedTrain extends Omit<Train, 'schedules'> {
-  schedules: string[];
+  schedules: TrainSchedule[];
   next_day_schedules: TrainNextDaySchedule[];
-  // ... 其他屬性
+  current_train: string;
+  prepare_train: string;
+  current_station: string;
+  next_station: string;
+  scheduled_departure: string;
+  estimated_arrival: string;
+  scheduleDetails: Array<{
+    trainNumber: string;
+    stations: Array<{
+      name: string;
+      scheduledArrival: string;
+      scheduledDeparture: string;
+      actualArrival?: string;
+      actualDeparture?: string;
+      status: "已過站" | "當前站" | "未到站";
+      delay?: number;
+    }>;
+  }>;
 }
 
