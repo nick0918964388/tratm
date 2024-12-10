@@ -32,6 +32,7 @@ interface EnhancedTrain extends Train {
   maintenanceLocation?: string;
   maintenanceStartTime?: string;
   maintenanceEndTime?: string;
+  otherDepotTrains?: EnhancedTrain[];
 }
 
 export function StatusModal({ isOpen, onClose, title, trains, status }: StatusModalProps) {
@@ -65,7 +66,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status }: StatusMo
             <TableHead className="w-[100px] sticky top-0 bg-white dark:bg-gray-800 pl-4">車號</TableHead>
             <TableHead className="sticky top-0 bg-white dark:bg-gray-800">狀態</TableHead>
             <TableHead className="sticky top-0 bg-white dark:bg-gray-800">目前運行車次</TableHead>
-            <TableHead className="sticky top-0 bg-white dark:bg-gray-800">起始站</TableHead>
+            <TableHead className="sticky top-0 bg-white dark:bg-gray-800">起���站</TableHead>
             <TableHead className="sticky top-0 bg-white dark:bg-gray-800">終點站</TableHead>
             <TableHead className="sticky top-0 bg-white dark:bg-gray-800">計畫運行時間</TableHead>
             <TableHead className="sticky top-0 bg-white dark:bg-gray-800 pr-4">預計抵達終點</TableHead>
@@ -88,8 +89,11 @@ export function StatusModal({ isOpen, onClose, title, trains, status }: StatusMo
           <TableRow>
             <TableHead className="w-[100px] sticky top-0 bg-white dark:bg-gray-800 pl-4">車號</TableHead>
             <TableHead className="sticky top-0 bg-white dark:bg-gray-800">狀態</TableHead>
-            <TableHead className="sticky top-0 bg-white dark:bg-gray-800">所在位置</TableHead>
-            <TableHead className="sticky top-0 bg-white dark:bg-gray-800 pr-4">動作</TableHead>
+            <TableHead className="sticky top-0 bg-white dark:bg-gray-800">目前運行車次</TableHead>
+            <TableHead className="sticky top-0 bg-white dark:bg-gray-800">起始站</TableHead>
+            <TableHead className="sticky top-0 bg-white dark:bg-gray-800">終點站</TableHead>
+            <TableHead className="sticky top-0 bg-white dark:bg-gray-800">計畫運行時間</TableHead>
+            <TableHead className="sticky top-0 bg-white dark:bg-gray-800 pr-4">預計抵達終點</TableHead>
           </TableRow>
         );
       case "在段待修":
@@ -147,24 +151,60 @@ export function StatusModal({ isOpen, onClose, title, trains, status }: StatusMo
         );
       case "預備":
         return (
-          <TableRow key={train.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-            <TableCell className="font-medium pl-4">{train.id}</TableCell>
-            <TableCell>
-              <Badge className={`${getStatusColor(train.status)} text-white px-3 py-1`}>
-                {train.status}
-              </Badge>
-            </TableCell>
-            <TableCell>{train.current_station || '-'}</TableCell>
-            <TableCell className="pr-4">
-              <button
-                onClick={() => toggleGroup(train.id)}
-                className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded"
-              >
-                {expandedGroups.includes(train.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                查看詳情
-              </button>
-            </TableCell>
-          </TableRow>
+          <>
+            <TableRow key={train.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+              <TableCell className="font-medium pl-4">{train.id}</TableCell>
+              <TableCell>
+                <Badge className={`${getStatusColor(train.status)} text-white px-3 py-1`}>
+                  {train.status}
+                </Badge>
+              </TableCell>
+              <TableCell>{train.current_train || '-'}</TableCell>
+              <TableCell>{train.startStation || '-'}</TableCell>
+              <TableCell>{train.endStation || '-'}</TableCell>
+              <TableCell>{train.runningTime || '-'}</TableCell>
+              <TableCell className="pr-4">
+                <button
+                  onClick={() => toggleGroup(train.id)}
+                  className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded"
+                >
+                  {expandedGroups.includes(train.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  其他段預備車
+                </button>
+              </TableCell>
+            </TableRow>
+            {expandedGroups.includes(train.id) && train.otherDepotTrains && (
+              <TableRow>
+                <TableCell colSpan={7} className="p-0">
+                  <div className="bg-gray-50 dark:bg-gray-800/50 p-4">
+                    <h4 className="text-sm font-semibold mb-2">其他段預備車列表</h4>
+                    <Table>
+                      <TableHeader>
+                        {renderTableHeader("預備")}
+                      </TableHeader>
+                      <TableBody>
+                        {train.otherDepotTrains.map(otherTrain => (
+                          <TableRow key={otherTrain.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                            <TableCell className="font-medium pl-4">{otherTrain.id}</TableCell>
+                            <TableCell>
+                              <Badge className={`${getStatusColor(otherTrain.status)} text-white px-3 py-1`}>
+                                {otherTrain.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{otherTrain.current_train || '-'}</TableCell>
+                            <TableCell>{otherTrain.startStation || '-'}</TableCell>
+                            <TableCell>{otherTrain.endStation || '-'}</TableCell>
+                            <TableCell>{otherTrain.runningTime || '-'}</TableCell>
+                            <TableCell className="pr-4">{otherTrain.timeToDestination || '-'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </>
         );
       case "在段待修":
       case "臨修(C2)":
@@ -226,6 +266,26 @@ export function StatusModal({ isOpen, onClose, title, trains, status }: StatusMo
             const timeToDestination = endTimeDate 
               ? formatDistanceToNow(endTimeDate, { locale: zhTW, addSuffix: true })
               : '-';
+
+            // 如果是預備車，獲取其他段的預備車資訊
+            if (train.status === "預備") {
+              try {
+                // 這裡需要實作獲取其他段預備車的邏輯
+                // 可能需要新增一個 API 端點來獲取這些資訊
+                const otherDepotTrains = await getOtherDepotTrains(train.id);
+                return {
+                  ...train,
+                  startStation: schedule.startingStationName,
+                  endStation: schedule.endingStationName,
+                  runningTime,
+                  timeToDestination,
+                  endTimeDate, // 保存日期用於排序
+                  otherDepotTrains
+                };
+              } catch (error) {
+                console.error(`獲取其他段預備車資訊失敗:`, error);
+              }
+            }
 
             return {
               ...train,
@@ -314,4 +374,11 @@ export function StatusModal({ isOpen, onClose, title, trains, status }: StatusMo
       </div>
     </div>
   );
+}
+
+// 需要實作這個函數來獲取其他段的預備車資訊
+async function getOtherDepotTrains(trainId: string): Promise<EnhancedTrain[]> {
+  // 實作獲取其他段預備車的邏輯
+  // 返回其他段的預備車列表
+  return [];
 } 
