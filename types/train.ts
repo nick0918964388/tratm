@@ -6,7 +6,8 @@ export type TrainStatus =
   | '臨修(C2)'
   | '進廠檢修(3B)'
   | '在段保養(2A)'
-  | '預備';
+  | '預備'
+  | '維修中';
 export type StationStatus = "已過站" | "當前站" | "未到站";
 
 export interface Station {
