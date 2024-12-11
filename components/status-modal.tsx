@@ -62,13 +62,13 @@ interface EnhancedTrain extends Train {
 }
 
 export function StatusModal({ isOpen, onClose, title, trains, status, handleScheduleClick, expandedSchedules, selectedSchedule, loadingSchedule }: StatusModalProps) {
-  if (!isOpen) return null;
-
   const [enhancedTrains, setEnhancedTrains] = useState<EnhancedTrain[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [otherDepotTrains, setOtherDepotTrains] = useState<Train[]>([]);
   const [showOtherDepot, setShowOtherDepot] = useState(false);
+
+  if (!isOpen) return null;
 
   const toggleGroup = (trainId: string) => {
     setExpandedGroups(prev => 
@@ -424,7 +424,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
 
               // 獲取時刻表資訊（運行中、等待出車、已出車完畢都需要）
               if (["運行中", "等待出車", "已出車完畢"].includes(train.status)) {
-                const scheduleToUse = train.status === "已出車完畢" 
+                const scheduleToUse = train.status === "已出車��畢" 
                   ? train.current_train 
                   : train.status === "運行中"
                     ? train.current_train
@@ -516,7 +516,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
                   // 計算預計抵達時間
                   let targetEndTime = endTimeDate;
                   if (endTimeDate < now) {
-                    // 只有在以下情況才加一天：
+                    // 只有在以下情況才加一���：
                     // 1. 計畫運行時間跨日
                     // 2. 或者 當前時間已經超過今天的結束時間，但計畫運行時間小於24小時
                     if (plannedDiffInMinutes > 1440 || // 超過24小時
@@ -603,7 +603,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
           })
         );
 
-        // 排序邏輯：已出車完畢的車輛按照完成時間倒序排列（最晚完成的在前面）
+        // 排序邏輯：已出車完畢的車輛按照完成時間倒序排列（最晚完成的��前面）
         const filteredAndSortedTrains = updatedTrains
           .filter((train): train is EnhancedTrain => train !== null)
           .sort((a, b) => {
@@ -629,7 +629,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
               return 0;
             }
 
-            // 已出車完畢的車輛按照完成時間倒序排列
+            // 已出車完畢的車輛按照��成時間倒序排列
             if (a.status === "已出車完畢" && b.status === "已出車完畢") {
               const timeA = a.timeToDestination || '00:00';
               const timeB = b.timeToDestination || '00:00';
