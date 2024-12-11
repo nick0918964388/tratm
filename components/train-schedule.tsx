@@ -25,7 +25,7 @@ interface TrainScheduleDetailProps {
   };
 }
 
-export function TrainScheduleDetail({ schedule }: TrainScheduleProps) {
+export function TrainScheduleDetail({ schedule }: TrainScheduleDetailProps) {
   if (!schedule) return null;
   
   const getDelayBadge = (delay?: number) => {
