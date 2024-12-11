@@ -1,4 +1,4 @@
-import { Train, TrainSchedule, TrainNextDaySchedule, TrainStatus } from "@/types/train"
+import { Train, TrainSchedule, TrainNextDaySchedule, TrainStatus, StationStatus } from "@/types/train"
 import {
   Table,
   TableBody,
