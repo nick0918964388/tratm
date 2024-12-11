@@ -100,7 +100,7 @@ interface DatabaseChangesPayload {
   table: string;
 }
 
-// 在 TrainDashboard 組定義快取
+// 在 TrainDashboard 組義快取
 const scheduleCache = new Map<string, {
   data: {
     departure_time: string;
@@ -178,7 +178,7 @@ const TrainRow = ({
                 key={schedule.train_number}
                 variant="outline"
                 className={`cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                  train.current_train === schedule.train_number
+                  train.current_train === schedule.train_number && train.status !== "已出車完畢"
                     ? "bg-sky-500 text-white dark:bg-sky-600"
                     : ""
                 } ${
@@ -336,7 +336,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
               .single();
 
             if (error) {
-              console.error('獲取更新資料失敗:', error);
+              console.error('獲取更新資料失��:', error);
               return;
             }
 
@@ -470,14 +470,18 @@ export function TrainDashboard({ initialData }: DashboardProps) {
   }
 
   const filterTrainGroups = (groups: ProcessedTrainGroup[]) => {
-    
     return groups
       .map((group) => ({
         ...group,
         trains: (group.trains || [])
-          .filter((train) =>
-            train.id.toLowerCase().includes(searchTerm.toLowerCase())
-          )
+          .filter((train) => {
+            // 只顯示運行中、等待出車和已出車完畢的車輛
+            const visibleStatuses = ["運行中", "等待出車", "已出車完畢"];
+            return (
+              visibleStatuses.includes(train.status) &&
+              train.id.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+          })
           .sort((a, b) => {
             // 先按照車型分類
             const typeA = a.id.match(/^[A-Za-z]+/)?.[0] || '';

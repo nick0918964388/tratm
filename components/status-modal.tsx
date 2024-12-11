@@ -239,7 +239,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
                       parseInt(schedule.endingTime.split(':')[1])
                     );
 
-                    // 如果結束時間比現在早，表示是今天完成的
+                    // 如果結束時間比現在早，表��是今天完成的
                     if (endTime <= now) {
                       timeToDestination = format(endTime, 'HH:mm', { locale: zhTW });
                     }
@@ -326,7 +326,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
     if (status === "預備") {
       const fetchOtherDepotTrains = async () => {
         try {
-          console.log('開始��取其他段預備車...');
+          console.log('開始取其他段預備車...');
           const trains = await getOtherDepotTrains();
           console.log('獲取到其他段預備車:', trains);
           setOtherDepotTrains(trains);
@@ -618,7 +618,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
       case "進廠檢修(3B)":
       case "在段保養(2A)":
       case "維修中":
-        // console.log('維修車輛��料:', train.maintenanceDetails);
+        // console.log('維修車輛料:', train.maintenanceDetails);
         return (
           <TableRow key={train.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
             <TableCell className="font-medium pl-4">{train.id}</TableCell>
@@ -652,7 +652,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
                   expandedSchedules?.trainId === train.id &&
                   expandedSchedules?.trainNumber === train.current_train
                     ? "ring-2 ring-sky-500"
-                    : "bg-gray-500 text-white dark:bg-gray-600"
+                    : ""
                 }`}
                 onClick={() => handleScheduleClick(train.id, train.current_train)}
               >
@@ -683,7 +683,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
         return "bg-emerald-500"
       case "準備中":
         return "bg-sky-500"
-      case "等��出車":
+      case "等待出車":
         return "bg-yellow-500"
       case "已出車完畢":
         return "bg-gray-500"
