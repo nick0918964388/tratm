@@ -31,7 +31,7 @@ interface StatusModalProps {
       scheduledDeparture: string;
       actualArrival?: string;
       actualDeparture?: string;
-      status: "已過站" | "當前站" | "未";
+      status: StationStatus;
       delay?: number;
     }>;
   } | null;
@@ -179,7 +179,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
                   // 計算預計抵達時間
                   let targetEndTime = endTimeDate;
                   if (endTimeDate < now) {
-                    // 只有在以下情況才加一���：
+                    // 只有在以下情況才加一：
                     // 1. 計畫運行時間跨日
                     // 2. 或者 當前時間已經超過今天的結束時間，但計畫運行時間小於24小時
                     if (plannedDiffInMinutes > 1440 || // 超過24小時
@@ -266,7 +266,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
           })
         );
 
-        // 排序邏輯：已出車完畢的車輛按照完成時間倒序排列（最晚完成的��前面）
+        // 排序邏輯：已出車完畢的車輛按照完成時間倒序排列（最晚完成的前面）
         const filteredAndSortedTrains = updatedTrains
           .filter((train): train is EnhancedTrain => train !== null)
           .sort((a, b) => {
@@ -292,7 +292,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
               return 0;
             }
 
-            // 已出車完畢的車輛按照��成時間倒序排列
+            // 已出車完畢的車輛按照完成時間倒序排列
             if (a.status === "已出車完畢" && b.status === "已出車完畢") {
               const timeA = a.timeToDestination || '00:00';
               const timeB = b.timeToDestination || '00:00';
@@ -326,7 +326,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
     if (status === "預備") {
       const fetchOtherDepotTrains = async () => {
         try {
-          console.log('開始獲取其他段預備車...');
+          console.log('開始��取其他段預備車...');
           const trains = await getOtherDepotTrains();
           console.log('獲取到其他段預備車:', trains);
           setOtherDepotTrains(trains);
@@ -389,7 +389,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
             <TableHead className="sticky top-0 bg-white dark:bg-gray-800">起始站</TableHead>
             <TableHead className="sticky top-0 bg-white dark:bg-gray-800">終點站</TableHead>
             <TableHead className="sticky top-0 bg-white dark:bg-gray-800">計畫運行時間</TableHead>
-            <TableHead className="sticky top-0 bg-white dark:bg-gray-800 pr-4">預計抵達終點</TableHead>
+            <TableHead className="sticky top-0 bg-white dark:bg-gray-800 pr-4">預計���達終點</TableHead>
           </TableRow>
         );
       case "等待出車":
@@ -618,7 +618,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
       case "進廠檢修(3B)":
       case "在段保養(2A)":
       case "維修中":
-        // console.log('維修車輛資料:', train.maintenanceDetails);
+        // console.log('維修車輛��料:', train.maintenanceDetails);
         return (
           <TableRow key={train.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
             <TableCell className="font-medium pl-4">{train.id}</TableCell>
@@ -683,7 +683,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
         return "bg-emerald-500"
       case "準備中":
         return "bg-sky-500"
-      case "等待出車":
+      case "等��出車":
         return "bg-yellow-500"
       case "已出車完畢":
         return "bg-gray-500"
