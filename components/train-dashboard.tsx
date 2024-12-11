@@ -100,7 +100,7 @@ interface DatabaseChangesPayload {
   table: string;
 }
 
-// 在 TrainDashboard 組件外部定義快取
+// 在 TrainDashboard 組定義快取
 const scheduleCache = new Map<string, {
   data: {
     departure_time: string;
@@ -639,7 +639,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
     const filteredTrains = allTrains
       .filter((t) => {
         if (status === "維修中") {
-          return ["段待修", "臨修(C2)", "進廠檢修(3B)", "在段保養(2A)"].includes(t.status);
+          return ["在段待修", "臨修(C2)", "進廠檢修(3B)", "在段保養(2A)"].includes(t.status);
         }
         return t.status === status;
       })
@@ -654,7 +654,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
         const numA = parseInt(a.id.match(/\d+/)?.[0] || '0');
         const numB = parseInt(b.id.match(/\d+/)?.[0] || '0');
         return numA - numB;
-      }) as unknown as Train[];
+      });
 
     setSelectedStatus({
       title,
@@ -685,7 +685,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
       if (a[key] === null || a[key] === undefined) return 1;
       if (b[key] === null || b[key] === undefined) return -1;
       
-      // 特殊處���狀態排序
+      // 特殊處理狀態排序
       if (key === 'status') {
         const statusOrder: { [key: string]: number } = {
           '運行中': 1,
@@ -894,7 +894,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
         </div>
 
         {/* 統計卡片 */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           <Card 
             className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => handleCardClick("運行中", "運行中車輛")}
@@ -965,6 +965,23 @@ export function TrainDashboard({ initialData }: DashboardProps) {
               </p>
             </CardContent>
           </Card>
+          <Card 
+            className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => handleCardClick("已出車完畢", "已出車完畢車輛")}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">已出車完畢</CardTitle>
+              <Clock className="h-4 w-4 text-gray-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {allTrains.filter(t => t.status === "已出車完畢").length}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                顯示今日已完成運行的車輛
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* 列表 */}
@@ -1020,7 +1037,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                                 className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
                                 onClick={() => handleSort('id')}
                               >
-                                車號 {sortConfig?.key === 'id' && (
+                                號 {sortConfig?.key === 'id' && (
                                   <span>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
                                 )}
                               </TableHead>
@@ -1078,6 +1095,10 @@ export function TrainDashboard({ initialData }: DashboardProps) {
           title={selectedStatus.title}
           trains={selectedStatus.trains}
           status={selectedStatus.status}
+          handleScheduleClick={handleScheduleClick}
+          expandedSchedules={expandedSchedules}
+          selectedSchedule={selectedSchedule}
+          loadingSchedule={loadingSchedule}
         />
       )}
     </div>
