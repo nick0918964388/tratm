@@ -8,8 +8,9 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Clock, AlertCircle } from 'lucide-react'
+import { StationStatus } from "@/types/train";
 
-interface TrainScheduleProps {
+interface TrainScheduleDetailProps {
   schedule: {
     trainNumber: string;
     stations: Array<{
@@ -18,7 +19,7 @@ interface TrainScheduleProps {
       scheduledDeparture: string;
       actualArrival?: string;
       actualDeparture?: string;
-      status: "已過站" | "當前站" | "未到站";
+      status: StationStatus;
       delay?: number;
     }> | [];
   };
