@@ -389,7 +389,7 @@ export function StatusModal({ isOpen, onClose, title, trains, status, handleSche
             <TableHead className="sticky top-0 bg-white dark:bg-gray-800">起始站</TableHead>
             <TableHead className="sticky top-0 bg-white dark:bg-gray-800">終點站</TableHead>
             <TableHead className="sticky top-0 bg-white dark:bg-gray-800">計畫運行時間</TableHead>
-            <TableHead className="sticky top-0 bg-white dark:bg-gray-800 pr-4">預計���達終點</TableHead>
+            <TableHead className="sticky top-0 bg-white dark:bg-gray-800 pr-4">預計抵達終點</TableHead>
           </TableRow>
         );
       case "等待出車":
