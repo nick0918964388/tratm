@@ -36,6 +36,12 @@ import {
   ChevronRight,
   Wrench
 } from 'lucide-react'
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
 
 import { TrainScheduleDetail } from "@/components/train-schedule"
 import { Train, TrainGroup, Station, TrainNextDaySchedule, TrainSchedule } from "@/types/train"
@@ -323,7 +329,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
           console.log('收到列車狀態更新:', payload);
           
           try {
-            // 獲取最新的列車資料，包含所有關聯資料
+            // 獲取最新的列車資料，含所有關聯資料
             const { data: updatedTrainData, error } = await supabase
               .from('trains')
               .select(`
@@ -336,7 +342,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
               .single();
 
             if (error) {
-              console.error('獲取更新資料失��:', error);
+              console.error('獲取更新資料失敗:', error);
               return;
             }
 
@@ -402,7 +408,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
         }, {} as { [key: string]: string })
         setStationMap(map)
       } catch (error) {
-        console.error('獲:', error)
+        console.error('獲取站點資料失敗:', error)
       }
     }
     loadStationDetails()
@@ -411,9 +417,41 @@ export function TrainDashboard({ initialData }: DashboardProps) {
   const refreshData = async () => {
     try {
       const data = await getTrainData()
-      console.log('更新的資料:', data)
+      console.log('新的資料:', data)
+      
+      // 更新本地狀態
       setGroups(processGroupData(data.groups))
       setStationSchedules(data.stationSchedules)
+
+      // 更新 Supabase 資料表
+      const updatePromises = data.groups.flatMap(group =>
+        group.trains.map(async (train) => {
+          try {
+            const { error } = await supabase
+              .from('trains')
+              .update({
+                status: train.status,
+                current_train: train.current_train,
+                current_station: train.current_station,
+                next_station: train.next_station,
+                scheduled_departure: train.scheduled_departure,
+                estimated_arrival: train.estimated_arrival,
+                driver: train.driver
+              })
+              .eq('id', train.id)
+
+            if (error) {
+              console.error(`更新列車 ${train.id} 資料失敗:`, error)
+            }
+          } catch (error) {
+            console.error(`更新列車 ${train.id} 時發生錯誤:`, error)
+          }
+        })
+      )
+
+      // 等待所有更新完成
+      await Promise.all(updatePromises)
+      
     } catch (error) {
       console.error('重新獲取資料失敗:', error)
     }
@@ -475,7 +513,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
         ...group,
         trains: (group.trains || [])
           .filter((train) => {
-            // 只顯示運行中、等待出車和已出車完畢的車輛
+            // 只示運行中、等待出車和已出車完畢的車輛
             const visibleStatuses = ["運行中", "等待出車", "已出車完畢"];
             return (
               visibleStatuses.includes(train.status) &&
@@ -571,7 +609,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
       ])
       
       console.log('獲取到時刻表:', scheduleData)
-      console.log('獲取到即時資訊:', liveData)
+      console.log('獲取即時資訊:', liveData)
       
       // 解析即時資訊
       const { currentStationId, nextStationId, delayMap } = parseLiveData(trainNo, liveData)
@@ -608,7 +646,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
           scheduledArrival: stop.arrivalTime,
           scheduledDeparture: stop.departureTime,
           actualArrival: status === "已過站" || status === "當前站" ? stop.arrivalTime : undefined,
-          actualDeparture: status === "已過站" ? stop.departureTime : undefined,
+          actualDeparture: status === "已過���" ? stop.departureTime : undefined,
           status,
           delay: typeof delay !== 'undefined' ? delay : undefined
         }
@@ -638,7 +676,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
     }
   }
 
-  // 添加一個通用的卡片點擊處數
+  // 在 handleCardClick 函數中添加排序邏輯
   const handleCardClick = (status: string, title: string) => {
     const filteredTrains = allTrains
       .filter((t) => {
@@ -648,13 +686,20 @@ export function TrainDashboard({ initialData }: DashboardProps) {
         return t.status === status;
       })
       .sort((a, b) => {
-        // 先按照車型分類
+        // 如果是等待出車狀態，則按預計發車時間排序
+        if (status === "等待出車") {
+          // 將時間字��轉換為 Date 對象進行比較
+          const timeA = a.scheduled_departure ? new Date(`2000/01/01 ${a.scheduled_departure}`) : new Date(9999, 11, 31);
+          const timeB = b.scheduled_departure ? new Date(`2000/01/01 ${b.scheduled_departure}`) : new Date(9999, 11, 31);
+          return timeA.getTime() - timeB.getTime();
+        }
+
+        // 其他狀態保持原有的排序邏輯
         const typeA = a.id.match(/^[A-Za-z]+/)?.[0] || '';
         const typeB = b.id.match(/^[A-Za-z]+/)?.[0] || '';
         if (typeA !== typeB) {
           return typeA.localeCompare(typeB);
         }
-        // 再按照數字排序
         const numA = parseInt(a.id.match(/\d+/)?.[0] || '0');
         const numB = parseInt(b.id.match(/\d+/)?.[0] || '0');
         return numA - numB;
@@ -739,7 +784,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
     setSortConfig({ key, direction });
   };
 
-  // 修改 sortTrainNumbers 函數，加入快取機制
+  // 修改 sortTrainNumbers 函��，加入快取機制
   const sortTrainNumbers = async (schedules: TrainSchedule[], nextDaySchedules: TrainNextDaySchedule[]) => {
     try {
       // 處理今日車次
@@ -880,7 +925,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <h2 className="text-2xl font-semibold tracking-tight">
-              即時24點報監控
+              七堵機務段
             </h2>
             <p className="text-sm text-muted-foreground">
               配置車輛：{allTrains.length} 輛
@@ -897,201 +942,234 @@ export function TrainDashboard({ initialData }: DashboardProps) {
           </div>
         </div>
 
-        {/* 統計卡片 */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          <Card 
-            className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => handleCardClick("運行中", "運行中車輛")}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">運行中車輛</CardTitle>
-              <TrainIcon className="h-4 w-4 text-emerald-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {allTrains.filter((t) => t.status === "運行中").length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                正常運行中的車輛數量
-              </p>
-            </CardContent>
-          </Card>
-          <Card 
-            className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => handleCardClick("等待出車", "等待出車")}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">等待出車</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {allTrains.filter((t) => t.status === "等待出車").length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                等待出車的車輛數量
-              </p>
-            </CardContent>
-          </Card>
-          <Card 
-            className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => handleCardClick("預備", "預備車輛")}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">預備車輛</CardTitle>
-              <AlertCircle className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {allTrains.filter((t) => t.status === "預備").length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                預備中的車輛數量
-              </p>
-            </CardContent>
-          </Card>
-          <Card 
-            className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => handleCardClick("維修中", "維修中車輛")}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">維修中車輛</CardTitle>
-              <Wrench className="h-4 w-4 text-rose-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {allTrains.filter((t) => 
-                  ["在段待修", "臨修(C2)", "進廠檢修(3B)", "在段保養(2A)"].includes(t.status)
-                ).length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                所有維修保養中的車輛數量
-              </p>
-            </CardContent>
-          </Card>
-          <Card 
-            className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => handleCardClick("已出車完畢", "已出車完畢車輛")}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">已出車完畢</CardTitle>
-              <Clock className="h-4 w-4 text-gray-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {allTrains.filter(t => t.status === "已出車完畢").length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                顯示今日已完成運行的車輛
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <Tabs defaultValue="monitor" className="space-y-4">
+          <TabsList className="bg-white dark:bg-gray-800 p-1 rounded-lg">
+            <TabsTrigger value="monitor" className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-700">
+              即時24點報監控
+            </TabsTrigger>
+            <TabsTrigger value="details" className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-700">
+              運轉明細
+            </TabsTrigger>
+          </TabsList>
 
-        {/* 列表 */}
-        <Card className="bg-white dark:bg-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>車輛運轉現況</CardTitle>
-              <CardDescription>
-                即時顯示本日目前 七堵機務段 所有車的運行狀態與位置資訊
-              </CardDescription>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold" suppressHydrationWarning>
-                {format(currentTime, "HH:mm:ss")}
-              </div>
-              <div className="text-sm text-muted-foreground" suppressHydrationWarning>
-                {format(currentTime, "yyyy年MM月dd日 EEEE", { locale: zhTW })}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {filteredGroups.map((group) => {
-                // 在這裡應用排序
-                const sortedTrains = sortConfig 
-                  ? sortTrains(group.trains, sortConfig.key, sortConfig.direction)
-                  : group.trains;
+          <TabsContent value="monitor">
+            <Card className="bg-white dark:bg-gray-800">
+              <CardHeader>
+                <CardTitle>七堵機務段 即時24點報監控</CardTitle>
+                <CardDescription>
+                  即時顯示各類型車輛數量統計
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {/* 運行中車輛卡片 */}
+                <Card 
+                  className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => handleCardClick("運行中", "運行中車輛")}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">運行中車輛</CardTitle>
+                    <TrainIcon className="h-4 w-4 text-emerald-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {allTrains.filter((t) => t.status === "運行中").length}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      正常運行中的車輛數量
+                    </p>
+                  </CardContent>
+                </Card>
 
-                return (
-                  <div key={group.id} className="border rounded-lg">                  
-                    <button
-                      onClick={() => toggleGroup(group.id)}
-                      className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        {expandedGroups.includes(group.id) ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                        <span className="font-medium">{group.name}</span>
-                        <Badge variant="outline">
-                          {group.trains.length} 輛列車
-                        </Badge>
-                      </div>
-                    </button>
-                    {expandedGroups.includes(group.id) && (
-                      <div className="border-t bg-white dark:bg-gray-800">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead 
-                                className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                                onClick={() => handleSort('id')}
-                              >
-                                號 {sortConfig?.key === 'id' && (
-                                  <span>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                                )}
-                              </TableHead>
-                              <TableHead 
-                                className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                                onClick={() => handleSort('status')}
-                              >
-                                狀態 {sortConfig?.key === 'status' && (
-                                  <span>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
-                                )}
-                              </TableHead>
-                              <TableHead>今日車次</TableHead>
-                              <TableHead>明日車次</TableHead>
-                              <TableHead className="bg-blue-100/50 dark:bg-blue-950/40">起始站</TableHead>
-                              <TableHead className="bg-blue-100/50 dark:bg-blue-950/40">始發時刻</TableHead>
-                              <TableHead className="bg-green-100/50 dark:bg-green-950/40">目前車站</TableHead>
-                              <TableHead className="bg-green-100/50 dark:bg-green-950/40">下一站</TableHead>
-                              <TableHead className="bg-green-100/50 dark:bg-green-950/40">預計到達時間</TableHead>
-                              <TableHead className="bg-green-100/50 dark:bg-green-950/40">預計發車時間</TableHead>
-                              <TableHead className="bg-purple-100/50 dark:bg-purple-950/40">終點站</TableHead>
-                              <TableHead className="bg-purple-100/50 dark:bg-purple-950/40">終點站時間</TableHead>
-                              <TableHead>司機員</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {sortedTrains.map((train) => (
-                              <TrainRow
-                                key={train.id}
-                                train={train}
-                                expandedSchedules={expandedSchedules}
-                                expandedGroups={expandedGroups}
-                                groupId={group.id}
-                                loadingSchedule={loadingSchedule}
-                                handleScheduleClick={handleScheduleClick}
-                                selectedSchedule={selectedSchedule}
-                                getStatusColor={getStatusColor}
-                                sortTrainNumbers={sortTrainNumbers}
-                              />
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
+                {/* 等待出車卡片 */}
+                <Card 
+                  className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => handleCardClick("等待出車", "等待出車")}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">等待出車</CardTitle>
+                    <Clock className="h-4 w-4 text-yellow-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {allTrains.filter((t) => t.status === "等待出車").length}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      等待出車的車輛數量
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* 預備車輛卡片 */}
+                <Card 
+                  className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => handleCardClick("預備", "預備車輛")}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">預備車輛</CardTitle>
+                    <AlertCircle className="h-4 w-4 text-blue-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {allTrains.filter((t) => t.status === "預備").length}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      預備中的車輛數量
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* 維修中車輛卡片 */}
+                <Card 
+                  className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => handleCardClick("維修中", "維修中車輛")}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">維修中車輛</CardTitle>
+                    <Wrench className="h-4 w-4 text-rose-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {allTrains.filter((t) => 
+                        ["在段待修", "臨修(C2)", "進廠檢修(3B)", "在段保養(2A)"].includes(t.status)
+                      ).length}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      所有維修保養中的車輛數量
+                    </p>
+                  </CardContent>
+                </Card>
+
+                {/* 已出車完畢卡片 */}
+                <Card 
+                  className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => handleCardClick("已出車完畢", "已出車完畢車輛")}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">已出車完畢</CardTitle>
+                    <Clock className="h-4 w-4 text-gray-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {allTrains.filter(t => t.status === "已出車完畢").length}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      顯示今日已完成運行的車輛
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="details">
+            <Card className="bg-white dark:bg-gray-800">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>車輛運轉現況</CardTitle>
+                  <CardDescription>
+                    即時顯示本日目前 七堵機務段 所有車的運行狀態與位置資訊
+                  </CardDescription>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold" suppressHydrationWarning>
+                    {format(currentTime, "HH:mm:ss")}
                   </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+                  <div className="text-sm text-muted-foreground" suppressHydrationWarning>
+                    {format(currentTime, "yyyy年MM月dd日 EEEE", { locale: zhTW })}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {filteredGroups.map((group) => {
+                    // 在這裡應用排序
+                    const sortedTrains = sortConfig 
+                      ? sortTrains(group.trains, sortConfig.key, sortConfig.direction)
+                      : group.trains;
+
+                    return (
+                      <div key={group.id} className="border rounded-lg">                  
+                        <button
+                          onClick={() => toggleGroup(group.id)}
+                          className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            {expandedGroups.includes(group.id) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                            <span className="font-medium">{group.name}</span>
+                            <Badge variant="outline">
+                              {group.trains.length} 輛列車
+                            </Badge>
+                          </div>
+                        </button>
+                        {expandedGroups.includes(group.id) && (
+                          <div className="border-t bg-white dark:bg-gray-800">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead 
+                                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                                    onClick={() => handleSort('id')}
+                                  >
+                                    號 {sortConfig?.key === 'id' && (
+                                      <span>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                                    )}
+                                  </TableHead>
+                                  <TableHead 
+                                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                                    onClick={() => handleSort('status')}
+                                  >
+                                    狀態 {sortConfig?.key === 'status' && (
+                                      <span>{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+                                    )}
+                                  </TableHead>
+                                  <TableHead>今日車次</TableHead>
+                                  <TableHead>明日車次</TableHead>
+                                  <TableHead className="bg-blue-100/50 dark:bg-blue-950/40">起始站</TableHead>
+                                  <TableHead className="bg-blue-100/50 dark:bg-blue-950/40">始發時刻</TableHead>
+                                  <TableHead className="bg-green-100/50 dark:bg-green-950/40">目前車站</TableHead>
+                                  <TableHead className="bg-green-100/50 dark:bg-green-950/40">下一站</TableHead>
+                                  <TableHead className="bg-green-100/50 dark:bg-green-950/40">預計到達時間</TableHead>
+                                  <TableHead className="bg-green-100/50 dark:bg-green-950/40">預計發車時間</TableHead>
+                                  <TableHead className="bg-purple-100/50 dark:bg-purple-950/40">終點站</TableHead>
+                                  <TableHead className="bg-purple-100/50 dark:bg-purple-950/40">終點站時間</TableHead>
+                                  <TableHead>司機員</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {sortedTrains.map((train) => (
+                                  <TrainRow
+                                    key={train.id}
+                                    train={train}
+                                    expandedSchedules={expandedSchedules}
+                                    expandedGroups={expandedGroups}
+                                    groupId={group.id}
+                                    loadingSchedule={loadingSchedule}
+                                    handleScheduleClick={handleScheduleClick}
+                                    selectedSchedule={selectedSchedule}
+                                    getStatusColor={getStatusColor}
+                                    sortTrainNumbers={sortTrainNumbers}
+                                  />
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
+
       {selectedStatus && (
         <StatusModal
           isOpen={!!selectedStatus}
