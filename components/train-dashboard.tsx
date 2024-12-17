@@ -342,7 +342,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
               .single();
 
             if (error) {
-              console.error('獲取更新資料失敗:', error);
+              console.error('獲���更新資料失敗:', error);
               return;
             }
 
@@ -425,7 +425,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
 
       // 更新 Supabase 資料表
       const updatePromises = data.groups.flatMap(group =>
-        group.trains.map(async (train) => {
+        (group.trains || []).map(async (train) => {
           try {
             const { error } = await supabase
               .from('trains')
@@ -511,7 +511,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
     return groups
       .map((group) => ({
         ...group,
-        trains: (group.trains || [])
+        trains: (group.trains ?? [])
           .filter((train) => {
             // 只示運行中、等待出車和已出車完畢的車輛
             const visibleStatuses = ["運行中", "等待出車", "已出車完畢"];
@@ -646,7 +646,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
           scheduledArrival: stop.arrivalTime,
           scheduledDeparture: stop.departureTime,
           actualArrival: status === "已過站" || status === "當前站" ? stop.arrivalTime : undefined,
-          actualDeparture: status === "已過���" ? stop.departureTime : undefined,
+          actualDeparture: status === "已過站" ? stop.departureTime : undefined,
           status,
           delay: typeof delay !== 'undefined' ? delay : undefined
         }
@@ -688,7 +688,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
       .sort((a, b) => {
         // 如果是等待出車狀態，則按預計發車時間排序
         if (status === "等待出車") {
-          // 將時間字��轉換為 Date 對象進行比較
+          // 將時間字轉換為 Date 對象進行比較
           const timeA = a.scheduled_departure ? new Date(`2000/01/01 ${a.scheduled_departure}`) : new Date(9999, 11, 31);
           const timeB = b.scheduled_departure ? new Date(`2000/01/01 ${b.scheduled_departure}`) : new Date(9999, 11, 31);
           return timeA.getTime() - timeB.getTime();
@@ -784,7 +784,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
     setSortConfig({ key, direction });
   };
 
-  // 修改 sortTrainNumbers 函��，加入快取機制
+  // 修改 sortTrainNumbers 函，加入快取機制
   const sortTrainNumbers = async (schedules: TrainSchedule[], nextDaySchedules: TrainNextDaySchedule[]) => {
     try {
       // 處理今日車次
@@ -813,7 +813,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
             arrival_time: data.endingTime || '-'
           };
 
-          // 儲存到快取
+          // 存到快取
           scheduleCache.set(cacheKey, {
             data: scheduleData,
             timestamp: now
@@ -1040,7 +1040,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                   </CardContent>
                 </Card>
 
-                {/* 已出車完畢卡片 */}
+                {/* 已出車���畢卡片 */}
                 <Card 
                   className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                   onClick={() => handleCardClick("已出車完畢", "已出車完畢車輛")}
