@@ -1038,7 +1038,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                           {allTrains.filter((t) => t.status === "運行中").length}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          正常���行中的車輛數量
+                          正常運行中車輛的車輛數量
                         </p>
                       </CardContent>
                     </Card>
