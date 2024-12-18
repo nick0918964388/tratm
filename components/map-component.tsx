@@ -121,8 +121,8 @@ export default function MapComponent({
 
   return (
     <MapContainer
-      center={[23.97565, 120.9738]}
-      zoom={8}
+      center={[24.934620, 121.083130]}
+      zoom={10}
       style={{ height: '100%', width: '100%' }}
       attributionControl={false}
     >

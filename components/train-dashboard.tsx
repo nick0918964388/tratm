@@ -443,7 +443,8 @@ export function TrainDashboard({ initialData }: DashboardProps) {
           const currentTrainNo = train.current_train || allSchedules[0];
           if (currentTrainNo) {
             const liveData = await getTrainLive(currentTrainNo);
-            const { currentStationId, nextStationId, delayTime } = parseLiveData(currentTrainNo, liveData);
+            const { currentStationId, nextStationId, delayMap } = parseLiveData(currentTrainNo, liveData);
+            const delayTime = delayMap[currentStationId] || 0;  // 從 delayMap 中獲取當前站的延誤時間
 
             // 取得車次時刻表以獲取預計到達和發車時間
             const scheduleData = await getTrainSchedule(currentTrainNo);
@@ -454,7 +455,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
               stop => stop.stationId === nextStationId
             );
 
-            // ���新 Supabase 資料庫
+            // 更新 Supabase 資料庫
             await supabase
               .from('trains')
               .update({
@@ -463,7 +464,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                 next_station: nextStationId,
                 scheduled_departure: currentStationSchedule?.departureTime || null,
                 estimated_arrival: nextStationSchedule?.arrivalTime || null,
-                delay: delayTime || 0
+                delay: delayTime
               })
               .eq('id', train.id);
           }
@@ -494,7 +495,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
       // 6. 顯示成功通知
       toast({
         title: "更新完成",
-        description: "所有車資���已更新",
+        description: "所有車資已更新",
       });
       
     } catch (error) {
@@ -847,7 +848,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
           const now = Date.now();
           const cached = scheduleCache.get(cacheKey);
           
-          // 如果快取存在且未過期（5分鐘）
+          // 如果快取存在且未過期（5鐘）
           if (cached && (now - cached.timestamp) < 5 * 60 * 1000) {
             console.log(`使用快取資料: ${cacheKey}`);
             return {
@@ -1037,7 +1038,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                           {allTrains.filter((t) => t.status === "運行中").length}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          正常運行中的車輛數量
+                          正常���行中的車輛數量
                         </p>
                       </CardContent>
                     </Card>
@@ -1125,14 +1126,24 @@ export function TrainDashboard({ initialData }: DashboardProps) {
 
               {/* 新增地圖卡片 */}
               <Card className="bg-white dark:bg-gray-800 relative z-10">
-                <CardHeader>
-                  <CardTitle>運行中車輛位置</CardTitle>
-                  <CardDescription>
-                    即時顯示目前運行中的車輛位置
-                  </CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>運行中車輛位置</CardTitle>
+                    <CardDescription>
+                      即時顯示目前運行中的車輛位置
+                    </CardDescription>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold" suppressHydrationWarning>
+                      {format(currentTime, "HH:mm:ss")}
+                    </div>
+                    <div className="text-sm text-muted-foreground" suppressHydrationWarning>
+                      {format(currentTime, "yyyy年MM月dd日 EEEE", { locale: zhTW })}
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[500px] w-full rounded-lg overflow-hidden">
+                  <div className="h-[650px] w-full rounded-lg overflow-hidden">
                     <TrainMap 
                       trains={allTrains.filter(train => train.status === "運行中")}
                       stationMap={stationMap}
