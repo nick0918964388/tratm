@@ -177,7 +177,7 @@ function getTrainStatus(
   // 如果找到當前站
   if (currentStationId) {
     return {
-      status: '運��中',
+      status: '運行中',
       currentStation: currentStationId,
       nextStation: stopTimes[stopTimes.length - 1].stationId === currentStationId
         ? null
@@ -249,20 +249,21 @@ function findNextStation(stopTimes: TrainStop[], currentStationId: string): stri
 
 async function determineTrainStatus(
   trainSchedules: string[],
-  currentTime: Date
+  currentTime: Date,
+  trainId: string
 ): Promise<TrainStatus> {
   let lastCompletedTrain = null;
   let nextUpcomingTrain = null;
 
-  console.log('開始判斷列車狀態:', { trainSchedules, currentTime });
+  console.log(trainId,'開始判斷列車狀態:', { trainSchedules, currentTime });
 
   // 先過濾出數字車次
   const validSchedules = trainSchedules.filter(trainNo => /^\d+$/.test(trainNo));
-  console.log('有效的���次清單:', validSchedules);
+  console.log(trainId,'有效的車次清單:', validSchedules);
 
   // 如果沒有有效車次，維持原狀態
   if (validSchedules.length === 0) {
-    console.log('沒有有效車次，返回預設狀態');
+    console.log(trainId,'沒有有效車次，返回預設狀態');
     return {
       status: '等待出車',
       currentTrain: null,
@@ -273,23 +274,23 @@ async function determineTrainStatus(
 
   // 按順序檢查每個車次
   for (const trainNo of validSchedules) {
-    console.log(`檢查車次 ${trainNo}...`);
+    console.log(trainId,`檢查車次 ${trainNo}...`);
     try {
       // 獲取車次時刻表和即時資訊
-      console.log(`正在獲取車次 ${trainNo} 的時刻表和即時資訊...`);
+      console.log(trainId,`正在獲取車次 ${trainNo} 的時刻表和即時資訊...`);
       const [scheduleData, liveData] = await Promise.all([
         getTrainSchedule(trainNo),
         getTrainLive(trainNo)
       ]);
-      console.log(`車次 ${trainNo} 的時刻表:`, scheduleData);
-      console.log(`車次 ${trainNo} 的即時資訊:`, liveData);
+      console.log(trainId,`車次 ${trainNo} 的時刻表:`, scheduleData);
+      console.log(trainId,`車次 ${trainNo} 的即時資訊:`, liveData);
 
       // 檢查是否有即時位置資訊
       const { currentStationId } = parseLiveData(trainNo, liveData);
-      console.log(`車次 ${trainNo} 的當前站點:`, currentStationId);
+      console.log(trainId,`車次 ${trainNo} 的當前站點:`, currentStationId);
 
       if (currentStationId) {
-        console.log(`車次 ${trainNo} 正在運行中，位於站點 ${currentStationId}`);
+        console.log(trainId,`車次 ${trainNo} 正在運行中，位於站點 ${currentStationId}`);
         return {
           status: '運行中',
           currentTrain: trainNo,
@@ -302,21 +303,21 @@ async function determineTrainStatus(
       const startTime = new Date(currentTime.toDateString() + ' ' + scheduleData.startingTime);
       const endTime = new Date(currentTime.toDateString() + ' ' + scheduleData.endingTime);
       
-      console.log(`車次 ${trainNo} 的時間資訊:`, {
+      console.log(trainId,`車次 ${trainNo} 的時間資訊:`, {
         currentTime: currentTime.toLocaleString(),
         startTime: startTime.toLocaleString(),
         endTime: endTime.toLocaleString()
       });
 
       if (currentTime > endTime) {
-        console.log(`車次 ${trainNo} 已結束運行`);
+        console.log(trainId,`車次 ${trainNo} 已結束運行`);
         lastCompletedTrain = {
           trainNo,
           endTime,
           lastStation: scheduleData.stopTimes[scheduleData.stopTimes.length - 1].stationId
         };
       } else if (currentTime < startTime && (!nextUpcomingTrain || startTime < new Date(currentTime.toDateString() + ' ' + nextUpcomingTrain.startTime))) {
-        console.log(`車次 ${trainNo} 尚未開始運行`);
+        console.log(trainId,`車次 ${trainNo} 尚未開始運行`);
         nextUpcomingTrain = {
           trainNo,
           startTime: scheduleData.startingTime,
@@ -324,18 +325,18 @@ async function determineTrainStatus(
         };
       }
     } catch (error) {
-      console.error(`檢查車次 ${trainNo} 時發生錯誤:`, error);
+      console.error(trainId,`檢查車次 ${trainNo} 時發生錯誤:`, error);
     }
   }
 
-  console.log('檢查完所有車次，結果:', {
+  console.log(trainId,'檢查完所有車次，結果:', {
     lastCompletedTrain,
     nextUpcomingTrain
   });
 
   // 根據時間判斷狀態
   if (!lastCompletedTrain && !nextUpcomingTrain) {
-    console.log('沒有已完成或即將開始的車次');
+    console.log(trainId,'沒有已完成或即將開始的車次');
     return {
       status: '等待出車',
       currentTrain: null,
@@ -345,7 +346,7 @@ async function determineTrainStatus(
   }
 
   if (lastCompletedTrain && !nextUpcomingTrain) {
-    console.log(`車次 ${lastCompletedTrain.trainNo} 已結束運行`);
+    console.log(trainId,`車次 ${lastCompletedTrain.trainNo} 已結束運行`);
     return {
       status: '已出車完畢',
       currentTrain: lastCompletedTrain.trainNo,
@@ -355,7 +356,7 @@ async function determineTrainStatus(
   }
 
   if (!lastCompletedTrain && nextUpcomingTrain) {
-    console.log(`車次 ${nextUpcomingTrain.trainNo} 尚未開始運行`);
+    console.log(trainId,`車次 ${nextUpcomingTrain.trainNo} 尚未開始運行`);
     return {
       status: '等待出車',
       currentTrain: nextUpcomingTrain.trainNo,
@@ -420,7 +421,7 @@ export async function updateTrainStatus(
   dailySchedules: string[]
 ): Promise<void> {
   const now = new Date();
-  const status = await determineTrainStatus(dailySchedules, now);
+  const status = await determineTrainStatus(dailySchedules, now,trainId);
   
   // 取得預計到達和發車時間
   let estimatedArrival = null;
@@ -457,7 +458,7 @@ export async function updateTrainStatus(
     }
   }
 
-  // 獲取車站名稱對照表
+  // 獲取車站名��對照表
   const { data: stationDetails } = await supabase
     .from('train_station_details')
     .select('station_id, station_name');

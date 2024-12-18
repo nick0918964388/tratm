@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -49,8 +49,10 @@ import { TitleBar } from "@/components/title-bar"
 import { format } from "date-fns"
 import { zhTW } from "date-fns/locale"
 import { supabase } from '@/lib/supabase'
-import { getTrainSchedule, TrainDetail, getStationDetails, parseLiveData, getTrainLive, getTrainData } from "@/lib/api"
+import { getTrainSchedule, TrainDetail, getStationDetails, parseLiveData, getTrainLive, getTrainData, updateTrainStatus } from "@/lib/api"
 import { StatusModal } from "@/components/status-modal"
+import { useToast } from "@/hooks/use-toast"
+import { TrainMap } from "@/components/train-map"
 
 interface DashboardProps {
   initialData: {
@@ -265,6 +267,8 @@ const TrainRow = ({
 };
 
 export function TrainDashboard({ initialData }: DashboardProps) {
+  const { toast } = useToast()
+
   // console.log('TrainDashboard 初始化')
   // console.log('接收到初始資料:', initialData)
 
@@ -342,7 +346,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
               .single();
 
             if (error) {
-              console.error('獲���更新資料失敗:', error);
+              console.error('獲取更新資料失敗:', error);
               return;
             }
 
@@ -416,46 +420,92 @@ export function TrainDashboard({ initialData }: DashboardProps) {
 
   const refreshData = async () => {
     try {
-      const data = await getTrainData()
-      console.log('新的資料:', data)
+      // 1. 先取得所有列車的當前資料
+      const currentTrains = groups.flatMap(group => group.trains || []);
       
-      // 更新本地狀態
-      setGroups(processGroupData(data.groups))
-      setStationSchedules(data.stationSchedules)
+      // 2. 依序更新每輛列車的狀態
+      const updatePromises = currentTrains.map(async (train) => {
+        try {
+          // 取得該列車的所有車次（包含今日和明日）
+          const allSchedules = [
+            ...(train.schedules?.map(s => s.train_number) || []),
+            ...(train.next_day_schedules?.map(s => s.train_number) || [])
+          ];
 
-      // 更新 Supabase 資料表
-      const updatePromises = data.groups.flatMap(group =>
-        (group.trains || []).map(async (train) => {
-          try {
-            const { error } = await supabase
+          console.log('更新列車:', train.id, '目前車次:', train.current_train, '所有車次:', allSchedules);
+          
+          if (!train.current_train && allSchedules.length === 0) {
+            console.log(`列車 ${train.id} 沒有車次資料，跳過更新`);
+            return;
+          }
+
+          // 取得列車即時資訊
+          const currentTrainNo = train.current_train || allSchedules[0];
+          if (currentTrainNo) {
+            const liveData = await getTrainLive(currentTrainNo);
+            const { currentStationId, nextStationId, delayTime } = parseLiveData(currentTrainNo, liveData);
+
+            // 取得車次時刻表以獲取預計到達和發車時間
+            const scheduleData = await getTrainSchedule(currentTrainNo);
+            const currentStationSchedule = scheduleData.stopTimes.find(
+              stop => stop.stationId === currentStationId
+            );
+            const nextStationSchedule = scheduleData.stopTimes.find(
+              stop => stop.stationId === nextStationId
+            );
+
+            // ���新 Supabase 資料庫
+            await supabase
               .from('trains')
               .update({
-                status: train.status,
-                current_train: train.current_train,
-                current_station: train.current_station,
-                next_station: train.next_station,
-                scheduled_departure: train.scheduled_departure,
-                estimated_arrival: train.estimated_arrival,
-                driver: train.driver
+                current_train: currentTrainNo,
+                current_station: currentStationId,
+                next_station: nextStationId,
+                scheduled_departure: currentStationSchedule?.departureTime || null,
+                estimated_arrival: nextStationSchedule?.arrivalTime || null,
+                delay: delayTime || 0
               })
-              .eq('id', train.id)
-
-            if (error) {
-              console.error(`更新列車 ${train.id} 資料失敗:`, error)
-            }
-          } catch (error) {
-            console.error(`更新列車 ${train.id} 時發生錯誤:`, error)
+              .eq('id', train.id);
           }
-        })
-      )
+          
+          // 呼叫 updateTrainStatus 更新狀態
+          await updateTrainStatus(
+            train.id,
+            train.current_train || '',
+            allSchedules
+          );
+        } catch (error) {
+          console.error(`更新列車 ${train.id} 狀態失敗:`, error);
+        }
+      });
 
-      // 等待所有更新完成
-      await Promise.all(updatePromises)
+      // 3. 等待所有更新完成
+      await Promise.all(updatePromises);
+
+      // 4. 重新獲取最新資料
+      const data = await getTrainData();
+      console.log('獲取更新後的資料:', data);
+      
+      // 5. 更新本地狀態
+      const processedGroups = processGroupData(data.groups);
+      setGroups(processedGroups);
+      setStationSchedules(data.stationSchedules);
+
+      // 6. 顯示成功通知
+      toast({
+        title: "更新完成",
+        description: "所有車資���已更新",
+      });
       
     } catch (error) {
-      console.error('重新獲取資料失敗:', error)
+      console.error('重新獲取資料失敗:', error);
+      toast({
+        variant: "destructive",
+        title: "更新失敗",
+        description: "無法獲取最新資料，請稍後再試",
+      });
     }
-  }
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -541,7 +591,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
     console.log('開始處理列車資料，數量:', trains.length)
     
     return trains.map(train => {
-      console.log(`處理列車 ${train.id} 的資料`)
+      console.log(`處列車 ${train.id} 的資料`)
       const processed = {
         ...train,
         schedules: train.schedules || [],  // 確保有預設值
@@ -589,7 +639,10 @@ export function TrainDashboard({ initialData }: DashboardProps) {
   })
 
   const filteredGroups = filterTrainGroups(groups)
-  const allTrains = groups.flatMap((group) => group.trains || [])
+  const allTrains = useMemo(() => 
+    groups.flatMap((group) => group.trains || []),
+    [groups]  // 當 groups 改變時重新計算
+  );
 
   const handleScheduleClick = async (trainId: string, trainNo: string) => {
     try {
@@ -913,6 +966,13 @@ export function TrainDashboard({ initialData }: DashboardProps) {
     }
   };
 
+  // 將 console.log 移到 useEffect 中，並只在開發環境執行
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('傳遞給地圖的列車:', allTrains.filter(train => train.status === "運行中"))
+    }
+  }, [allTrains]) // 只在 allTrains 改變時執行
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <TitleBar 
@@ -953,114 +1013,134 @@ export function TrainDashboard({ initialData }: DashboardProps) {
           </TabsList>
 
           <TabsContent value="monitor">
-            <Card className="bg-white dark:bg-gray-800">
-              <CardHeader>
-                <CardTitle>七堵機務段 即時24點報監控</CardTitle>
-                <CardDescription>
-                  即時顯示各類型車輛數量統計
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                {/* 運行中車輛卡片 */}
-                <Card 
-                  className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => handleCardClick("運行中", "運行中車輛")}
-                >
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">運行中車輛</CardTitle>
-                    <TrainIcon className="h-4 w-4 text-emerald-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {allTrains.filter((t) => t.status === "運行中").length}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      正常運行中的車輛數量
-                    </p>
-                  </CardContent>
-                </Card>
+            <div className="space-y-4">
+              <Card className="bg-white dark:bg-gray-800">
+                <CardHeader>
+                  <CardTitle>七堵機務段 即時24點報監控</CardTitle>
+                  <CardDescription>
+                    即時顯示各類型車輛數量統計
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                    {/* 運行中車輛卡片 */}
+                    <Card 
+                      className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => handleCardClick("運行中", "運行中車輛")}
+                    >
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">運行中車輛</CardTitle>
+                        <TrainIcon className="h-4 w-4 text-emerald-500" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {allTrains.filter((t) => t.status === "運行中").length}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          正常運行中的車輛數量
+                        </p>
+                      </CardContent>
+                    </Card>
 
-                {/* 等待出車卡片 */}
-                <Card 
-                  className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => handleCardClick("等待出車", "等待出車")}
-                >
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">等待出車</CardTitle>
-                    <Clock className="h-4 w-4 text-yellow-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {allTrains.filter((t) => t.status === "等待出車").length}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      等待出車的車輛數量
-                    </p>
-                  </CardContent>
-                </Card>
+                    {/* 等待出車卡片 */}
+                    <Card 
+                      className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => handleCardClick("等待出車", "等待出車")}
+                    >
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">等待出車</CardTitle>
+                        <Clock className="h-4 w-4 text-yellow-500" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {allTrains.filter((t) => t.status === "等待出車").length}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          等待出車的車輛數量
+                        </p>
+                      </CardContent>
+                    </Card>
 
-                {/* 預備車輛卡片 */}
-                <Card 
-                  className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => handleCardClick("預備", "預備車輛")}
-                >
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">預備車輛</CardTitle>
-                    <AlertCircle className="h-4 w-4 text-blue-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {allTrains.filter((t) => t.status === "預備").length}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      預備中的車輛數量
-                    </p>
-                  </CardContent>
-                </Card>
+                    {/* 預備車輛卡片 */}
+                    <Card 
+                      className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => handleCardClick("預備", "預備車輛")}
+                    >
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">預備車輛</CardTitle>
+                        <AlertCircle className="h-4 w-4 text-blue-500" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {allTrains.filter((t) => t.status === "預備").length}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          預備中的車輛數量
+                        </p>
+                      </CardContent>
+                    </Card>
 
-                {/* 維修中車輛卡片 */}
-                <Card 
-                  className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => handleCardClick("維修中", "維修中車輛")}
-                >
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">維修中車輛</CardTitle>
-                    <Wrench className="h-4 w-4 text-rose-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {allTrains.filter((t) => 
-                        ["在段待修", "臨修(C2)", "進廠檢修(3B)", "在段保養(2A)"].includes(t.status)
-                      ).length}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      所有維修保養中的車輛數量
-                    </p>
-                  </CardContent>
-                </Card>
+                    {/* 維修中車輛卡片 */}
+                    <Card 
+                      className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => handleCardClick("維修中", "維修中車輛")}
+                    >
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">維修中車輛</CardTitle>
+                        <Wrench className="h-4 w-4 text-rose-500" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {allTrains.filter((t) => 
+                            ["在段待修", "臨修(C2)", "進廠檢修(3B)", "在段保養(2A)"].includes(t.status)
+                          ).length}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          所有維修保養中的車輛數量
+                        </p>
+                      </CardContent>
+                    </Card>
 
-                {/* 已出車���畢卡片 */}
-                <Card 
-                  className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => handleCardClick("已出車完畢", "已出車完畢車輛")}
-                >
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">已出車完畢</CardTitle>
-                    <Clock className="h-4 w-4 text-gray-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {allTrains.filter(t => t.status === "已出車完畢").length}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      顯示今日已完成運行的車輛
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-              </CardContent>
-            </Card>
+                    {/* 已出車畢卡片 */}
+                    <Card 
+                      className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => handleCardClick("已出車完畢", "已出車完畢車輛")}
+                    >
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">已出車完畢</CardTitle>
+                        <Clock className="h-4 w-4 text-gray-500" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {allTrains.filter(t => t.status === "已出車完畢").length}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          顯示今日已完成運行的車輛
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 新增地圖卡片 */}
+              <Card className="bg-white dark:bg-gray-800 relative z-10">
+                <CardHeader>
+                  <CardTitle>運行中車輛位置</CardTitle>
+                  <CardDescription>
+                    即時顯示目前運行中的車輛位置
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[500px] w-full rounded-lg overflow-hidden">
+                    <TrainMap 
+                      trains={allTrains.filter(train => train.status === "運行中")}
+                      stationMap={stationMap}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="details">
@@ -1084,7 +1164,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
               <CardContent>
                 <div className="space-y-4">
                   {filteredGroups.map((group) => {
-                    // 在這裡應用排序
+                    // 這裡應用排序
                     const sortedTrains = sortConfig 
                       ? sortTrains(group.trains, sortConfig.key, sortConfig.direction)
                       : group.trains;
