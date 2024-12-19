@@ -64,26 +64,14 @@ export interface TrainGroup {
   trains?: Train[]
 }
 
-export interface ProcessedTrain extends Omit<Train, 'schedules'> {
-  schedules: TrainSchedule[];
-  next_day_schedules: TrainNextDaySchedule[];
+export interface ProcessedTrain extends Train {
   current_train: string;
   prepare_train: string;
   current_station: string;
   next_station: string;
   scheduled_departure: string;
   estimated_arrival: string;
-  scheduleDetails: Array<{
-    trainNumber: string;
-    stations: Array<{
-      name: string;
-      scheduledArrival: string;
-      scheduledDeparture: string;
-      actualArrival?: string;
-      actualDeparture?: string;
-      status: "已過站" | "當前站" | "未到站";
-      delay?: number;
-    }>;
-  }>;
+  schedules: TrainSchedule[];
+  next_day_schedules: TrainNextDaySchedule[];
 }
 
