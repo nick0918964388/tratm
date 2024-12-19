@@ -51,6 +51,8 @@ import { zhTW } from "date-fns/locale"
 import { supabase } from '@/lib/supabase'
 import { getTrainSchedule, TrainDetail, getStationDetails, parseLiveData, getTrainLive, getTrainData } from "@/lib/api"
 import { StatusModal } from "@/components/status-modal"
+import dynamic from 'next/dynamic'
+import 'leaflet/dist/leaflet.css'
 
 interface DashboardProps {
   initialData: {
@@ -264,6 +266,14 @@ const TrainRow = ({
   );
 };
 
+// 動態導入地圖組件以避免 SSR 問題
+const TrainMap = dynamic(() => import('@/components/train-map'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[400px] bg-gray-100 dark:bg-gray-800 animate-pulse rounded-lg"></div>
+  )
+})
+
 export function TrainDashboard({ initialData }: DashboardProps) {
   // console.log('TrainDashboard 初始化')
   // console.log('接收到初始資料:', initialData)
@@ -342,7 +352,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
               .single();
 
             if (error) {
-              console.error('獲���更新資料失敗:', error);
+              console.error('獲取更新資料失敗:', error);
               return;
             }
 
@@ -681,7 +691,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
     const filteredTrains = allTrains
       .filter((t) => {
         if (status === "維修中") {
-          return ["在段待修", "臨修(C2)", "進廠檢修(3B)", "在段保養(2A)"].includes(t.status);
+          return ["在段待修", "臨修(C2)", "進廠檢修(3B)", "��段保養(2A)"].includes(t.status);
         }
         return t.status === status;
       })
@@ -950,6 +960,9 @@ export function TrainDashboard({ initialData }: DashboardProps) {
             <TabsTrigger value="details" className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-700">
               運轉明細
             </TabsTrigger>
+            <TabsTrigger value="map" className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-700">
+              列車地圖
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="monitor">
@@ -1040,7 +1053,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                   </CardContent>
                 </Card>
 
-                {/* 已出車���畢卡片 */}
+                {/* 已出車畢卡片 */}
                 <Card 
                   className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                   onClick={() => handleCardClick("已出車完畢", "已出車完畢車輛")}
@@ -1164,6 +1177,20 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                     );
                   })}
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="map">
+            <Card className="bg-white dark:bg-gray-800">
+              <CardHeader>
+                <CardTitle>列車即時位置地圖</CardTitle>
+                <CardDescription>
+                  顯示目前運行中列車的即時位置
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TrainMap trains={allTrains.filter(train => train.status === "運行中")} />
               </CardContent>
             </Card>
           </TabsContent>
