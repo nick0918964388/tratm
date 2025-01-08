@@ -51,6 +51,8 @@ import { zhTW } from "date-fns/locale"
 import { supabase } from '@/lib/supabase'
 import { getTrainSchedule, TrainDetail, getStationDetails, parseLiveData, getTrainLive, getTrainData, updateTrainStatus } from "@/lib/api"
 import { StatusModal } from "@/components/status-modal"
+import dynamic from 'next/dynamic'
+import 'leaflet/dist/leaflet.css'
 import { useToast } from "@/hooks/use-toast"
 import { TrainMap } from "@/components/train-map"
 
@@ -265,6 +267,14 @@ const TrainRow = ({
     </React.Fragment>
   );
 };
+
+// 動態導入地圖組件以避免 SSR 問題
+const TrainMap = dynamic(() => import('@/components/train-map'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[400px] bg-gray-100 dark:bg-gray-800 animate-pulse rounded-lg"></div>
+  )
+})
 
 export function TrainDashboard({ initialData }: DashboardProps) {
   const { toast } = useToast()
@@ -735,7 +745,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
     const filteredTrains = allTrains
       .filter((t) => {
         if (status === "維修中") {
-          return ["在段待修", "臨修(C2)", "進廠檢修(3B)", "在段保養(2A)"].includes(t.status);
+          return ["在段待修", "臨修(C2)", "進廠檢修(3B)", "��段保養(2A)"].includes(t.status);
         }
         return t.status === status;
       })
@@ -1011,6 +1021,9 @@ export function TrainDashboard({ initialData }: DashboardProps) {
             <TabsTrigger value="details" className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-700">
               運轉明細
             </TabsTrigger>
+            <TabsTrigger value="map" className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-700">
+              列車地圖
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="monitor">
@@ -1102,56 +1115,27 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                       </CardContent>
                     </Card>
 
-                    {/* 已出車畢卡片 */}
-                    <Card 
-                      className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => handleCardClick("已出車完畢", "已出車完畢車輛")}
-                    >
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">已出車完畢</CardTitle>
-                        <Clock className="h-4 w-4 text-gray-500" />
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">
-                          {allTrains.filter(t => t.status === "已出車完畢").length}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          顯示今日已完成運行的車輛
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* 新增地圖卡片 */}
-              <Card className="bg-white dark:bg-gray-800 relative z-10">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>運行中車輛位置</CardTitle>
-                    <CardDescription>
-                      即時顯示目前運行中的車輛位置
-                    </CardDescription>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold" suppressHydrationWarning>
-                      {format(currentTime, "HH:mm:ss")}
+                {/* 已出車���畢卡片 */}
+                <Card 
+                  className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => handleCardClick("已出車完畢", "已出車完畢車輛")}
+                >
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">已出車完畢</CardTitle>
+                    <Clock className="h-4 w-4 text-gray-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {allTrains.filter(t => t.status === "已出車完畢").length}
                     </div>
-                    <div className="text-sm text-muted-foreground" suppressHydrationWarning>
-                      {format(currentTime, "yyyy年MM月dd日 EEEE", { locale: zhTW })}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[650px] w-full rounded-lg overflow-hidden">
-                    <TrainMap 
-                      trains={allTrains.filter(train => train.status === "運行中")}
-                      stationMap={stationMap}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                    <p className="text-xs text-muted-foreground">
+                      顯示今日已完成運行的車輛
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="details">
@@ -1255,6 +1239,20 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                     );
                   })}
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="map">
+            <Card className="bg-white dark:bg-gray-800">
+              <CardHeader>
+                <CardTitle>列車即時位置地圖</CardTitle>
+                <CardDescription>
+                  顯示目前運行中列車的即時位置
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TrainMap trains={allTrains.filter(train => train.status === "運行中")} />
               </CardContent>
             </Card>
           </TabsContent>
