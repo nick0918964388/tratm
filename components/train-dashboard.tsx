@@ -54,7 +54,7 @@ import { StatusModal } from "@/components/status-modal"
 import dynamic from 'next/dynamic'
 import 'leaflet/dist/leaflet.css'
 import { useToast } from "@/hooks/use-toast"
-import { TrainMap } from "@/components/train-map"
+import TrainMap from "@/components/train-map"
 
 interface DashboardProps {
   initialData: {
@@ -745,7 +745,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
     const filteredTrains = allTrains
       .filter((t) => {
         if (status === "維修中") {
-          return ["在段待修", "臨修(C2)", "進廠檢修(3B)", "��段保養(2A)"].includes(t.status);
+          return ["在段待修", "臨修(C2)", "進廠檢修(3B)", "在段保養(2A)"].includes(t.status);
         }
         return t.status === status;
       })
@@ -1115,27 +1115,28 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                       </CardContent>
                     </Card>
 
-                {/* 已出車���畢卡片 */}
-                <Card 
-                  className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => handleCardClick("已出車完畢", "已出車完畢車輛")}
-                >
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">已出車完畢</CardTitle>
-                    <Clock className="h-4 w-4 text-gray-500" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {allTrains.filter(t => t.status === "已出車完畢").length}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      顯示今日已完成運行的車輛
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-              </CardContent>
-            </Card>
+                    {/* 已出車完畢卡片 */}
+                    <Card 
+                      className="shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => handleCardClick("已出車完畢", "已出車完畢車輛")}
+                    >
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">已出車完畢</CardTitle>
+                        <Clock className="h-4 w-4 text-gray-500" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {allTrains.filter(t => t.status === "已出車完畢").length}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          顯示今日已完成運行的車輛
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="details">
