@@ -9,7 +9,7 @@ export async function GET(
     console.log('正在獲取列車時刻表:', trainNo)
 
     const response = await fetch(
-      `https://taiwanhelper.com/_next/data/bsBsvlyiGDJiVhyivWDW6/railway/train/${trainNo}.json?no=${trainNo}`,
+      `https://taiwanhelper.com/_next/data/i5Qo2rmb7fABQ7fB01Ipa/railway/train/${trainNo}.json?no=${trainNo}`,
       {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
