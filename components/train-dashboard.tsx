@@ -268,8 +268,8 @@ const TrainRow = ({
   );
 };
 
-// 修改這個動態導入的命名
-const MapComponent = dynamic(() => import('@/components/train-map'), {
+// 動態導入地圖組件以避免 SSR 問題
+const TrainMap = dynamic(() => import('@/components/train-map'), {
   ssr: false,
   loading: () => (
     <div className="w-full h-[400px] bg-gray-100 dark:bg-gray-800 animate-pulse rounded-lg"></div>
@@ -1019,7 +1019,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
               即時24點報監控
             </TabsTrigger>
             <TabsTrigger value="details" className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-700">
-              運運轉明細
+              運轉明細
             </TabsTrigger>
             <TabsTrigger value="map" className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-700">
               列車地圖
@@ -1253,7 +1253,7 @@ export function TrainDashboard({ initialData }: DashboardProps) {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <MapComponent trains={allTrains.filter(train => train.status === "運行中")} />
+                <TrainMap trains={allTrains.filter(train => train.status === "運行中")} />
               </CardContent>
             </Card>
           </TabsContent>
